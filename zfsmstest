@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# setup
+typeset tmpdir="$(mktemp --directory --tmpdir zfsms.XXXXXXXX)"
+truncate "$tmpdir"/test.zpool --size 1G
+sudo zpool create -R "$tmpdir" ztest "$tmpdir/test.zpool"
+echo initzkey | sudo zfs create -o encryption=on -o keyformat=passphrase ztest/test
+
+# test
+sudo ./zfsms convert -p asdfasdf ztest/test
+sudo ./zfsms load-key -n -s default -p asdfasdf ztest/test
+[[ "$(./zfsms list-slots ztest/test)" == "default" ]] || echo "list-slots failed" >&2
+
+# cleanup
+sudo zpool destroy ztest
+rm -rf $tmpdir
