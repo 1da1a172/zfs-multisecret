@@ -1,402 +1,404 @@
 #!/bin/bash
 
 # zfs user properties:
-#  - wrappedkey:slot
-#  - pbkdf2iters:slot
+#	- wrappedkey:slot
+#	- pbkdf2iters:slot
 
 typeset DEFAULT_SLOT='default'
 typeset CIPHER='aes-256-ctr'
 typeset DEFAULT_ITERS=350000
 
 function main() {
-  local subcmd="$1"
-  shift
-  case "$subcmd" in
-  "convert")     convert     "$@" ;;
-  "load-key")    load-key    "$@" ;;
-  "add-key")     add-key     "$@" ;;
-  "remove-slot") remove-slot "$@" ;;
-  "remove-key")  remove-key  "$@" ;;
-  "change-key")  change-key  "$@" ;;
-  "list-slots")  list-slots  "$@" ;;
-  "-h") ;&
-  "--help") ;&
-  "help")
-    help
-    exit 0
-    ;;
-  "")
-    help
-    exit 1
-    ;;
-  *)
-    echo "Unknown subcommand '$subcmd'" >&2
-    help
-    exit 1
-    ;;
-  esac
+	local subcmd="$1"
+	shift
+	case "$subcmd" in
+	"convert")     convert     "$@" ;;
+	"load-key")    load-key    "$@" ;;
+	"add-key")     add-key     "$@" ;;
+	"remove-slot") remove-slot "$@" ;;
+	"remove-key")  remove-key  "$@" ;;
+	"change-key")  change-key  "$@" ;;
+	"list-slots")  list-slots  "$@" ;;
+	"-h") ;&
+	"--help") ;&
+	"help")
+		help
+		exit 0
+		;;
+	"")
+		help
+		exit 1
+		;;
+	*)
+		echo "Unknown subcommand '$subcmd'" >&2
+		help
+		exit 1
+		;;
+	esac
 }
 
 function help() {
-  printf 'usage:\n'
-  printf '\t%s convert -p <passphrase>|prompt|- [-s <slot>] <filesystem>\n' "$0"
-  printf '\t%s load-key [-n] -p <passphrase>|prompt|-> [-s <slot>] <filesystem>\n' "$0"
-  printf '\t%s add-key -s <new slot> -u <existing slot> [-i <iters>] <filesystem>\n' "$0"
-  printf '\t%s remove-slot -s slot <filesystem>\n' "$0"
-  printf '\t%s remove-key [-o keylocation=value] <filesystem>\n' "$0"
-  printf '\t%s change-key [-l] [-o keylocation@slot=value] [-o keyformat@slot=value] [-o pbkdf2iters@slot=value] <filesystem>\n' "$0"
-  printf '\t%s change-key -i [-l] <filesystem>\n' "$0"
-  printf '\t%s list-slots <filesystem>\n' "$0"
+	printf 'usage:\n'
+	printf '\t%s convert -p <passphrase>|prompt|- [-s <slot>] <filesystem>\n' "$0"
+	printf '\t%s load-key [-n] -p <passphrase>|prompt|- [-s <slot>] <filesystem>\n' "$0"
+	printf '\t%s add-key -s <new slot> -u <existing slot> [-i <iters>] <filesystem>\n' "$0"
+	printf '\t%s remove-slot -s slot <filesystem>\n' "$0"
+	printf '\t%s remove-key [-o keylocation=value] <filesystem>\n' "$0"
+	printf '\t%s change-key [-l] [-o keylocation@slot=value] [-o keyformat@slot=value] [-o pbkdf2iters@slot=value] <filesystem>\n' "$0"
+	printf '\t%s change-key -i [-l] <filesystem>\n' "$0"
+	printf '\t%s list-slots <filesystem>\n' "$0"
 }
 
 function convert() {
-  local keystatus
-  local filesystem
-  local slot
-  local psph
-  local cpsph
-  local iters
-  local zkey
-  local wrappedkey
+	local keystatus
+	local filesystem
+	local slot
+	local psph
+	local cpsph
+	local iters
+	local zkey
+	local wrappedkey
 
-  while getopts p:s: name; do
-    case "$name" in
-      'p') psph="$OPTARG" ;;
-      's') slot="$OPTARG" ;;
-      *)
-        help >&2
-        exit 1
-        ;;
-    esac
-  done
-  shift $(($OPTIND - 1))
-  filesystem="$1"
-  if [[ -z "$filesystem" ]]; then
-    echo 'Filesystem not specified.' >&2
-    exit 1
-  fi
-  shift
-  [[ $# -eq 0 ]] || echo "WARNING: '$1' and later arguments are ignored." >&2
-  [[ -n "$slot" ]] || slot="$DEFAULT_SLOT"
+	while getopts p:s: name; do
+		case "$name" in
+			'p') psph="$OPTARG" ;;
+			's') slot="$OPTARG" ;;
+			*)
+				help >&2
+				exit 1
+				;;
+		esac
+	done
+	shift $(($OPTIND - 1))
+	filesystem="$1"
+	if [[ -z "$filesystem" ]]; then
+		echo 'Filesystem not specified.' >&2
+		exit 1
+	fi
+	shift
+	[[ $# -eq 0 ]] || echo "WARNING: '$1' and later arguments are ignored." >&2
+	[[ -n "$slot" ]] || slot="$DEFAULT_SLOT"
 
-  keystatus="$(zfs get -Ho value keystatus $filesystem)"
-  encroot="$(zfs get -Ho value encryptionroot $filesystem)"
-  [[ 0 == $? ]] || exit 1 # the above would already give an error msg
+	keystatus="$(zfs get -Ho value keystatus $filesystem)"
+	encroot="$(zfs get -Ho value encryptionroot $filesystem)"
+	[[ 0 == $? ]] || exit 1 # the above would already give an error msg
 
-  if [[ '-' == "$keystatus" ]]; then
-    echo "Dataset '$1' is not encrypted" >&2
-    exit 1
-  elif [[ 'unavailable' == "$keystatus" ]]; then
-    echo "Key must be loaded to convert to a multisecret dataset" >&2
-    exit 1
-  elif [[ 'available' != "$keystatus" ]]; then
-    echo "Unknown key status: $keystatus" >&2
-    exit 1
-  elif [[ "$filesystem" != "$encroot" ]]; then
-    echo "Use the encryption root: $encroot" >&2
-    exit 1
-  fi
+	if [[ '-' == "$keystatus" ]]; then
+		echo "Dataset '$1' is not encrypted" >&2
+		exit 1
+	elif [[ 'unavailable' == "$keystatus" ]]; then
+		echo "Key must be loaded to convert to a multisecret dataset" >&2
+		exit 1
+	elif [[ 'available' != "$keystatus" ]]; then
+		echo "Unknown key status: $keystatus" >&2
+		exit 1
+	elif [[ "$filesystem" != "$encroot" ]]; then
+		echo "Use the encryption root: $encroot" >&2
+		exit 1
+	fi
 
-  [[ -z "$slot" ]] && slot=$DEFAULT_SLOT
-  if [[ '-' == "$psph" ]]; then
-    read psph
-  elif [[ 'prompt' == "$psph" ]]; then
-    while
-      read -s -p 'Enter passphrase: ' psph
-      printf '\n'
-      read -s -p 'Confirm passphrase: ' cpsph
-      printf '\n'
-      [[ "$psph" != "$cpsph" ]] && [[ -n "$psph" ]] # loop condition
-    do :; done
-  fi
+	[[ -z "$slot" ]] && slot=$DEFAULT_SLOT
+	if [[ '-' == "$psph" ]]; then
+		read psph
+	elif [[ 'prompt' == "$psph" ]]; then
+		while
+			read -s -p 'Enter passphrase: ' psph
+			printf '\n'
+			read -s -p 'Confirm passphrase: ' cpsph
+			printf '\n'
+			[[ "$psph" != "$cpsph" ]] && [[ -n "$psph" ]] # loop condition
+		do :; done
+	fi
 
-  iters="$(zfs get -Ho value pbkdf2iters $filesystem)"
-  [[ 0 == "$iters" ]] && iters="$DEFAULT_ITERS"
+	iters="$(zfs get -Ho value pbkdf2iters $filesystem)"
+	[[ 0 == "$iters" ]] && iters="$DEFAULT_ITERS"
 
-  zkey="$(dd if=/dev/random status=none bs=32 count=1 | xxd -p -c 0)"
+	zkey="$(dd if=/dev/random status=none bs=32 count=1 | xxd -p -c 0)"
 
-  wrap-and-add-key "$zkey" "$psph" "$slot" "$iters" "$filesystem"
-  zfs change-key \
-    -o keylocation=prompt \
-    -o keyformat=hex \
-    "$filesystem" \
-    <<< "$zkey"
+	wrap-and-add-key "$zkey" "$psph" "$slot" "$iters" "$filesystem"
+	zfs change-key \
+		-o keylocation=prompt \
+		-o keyformat=hex \
+		"$filesystem" \
+		<<< "$zkey"
 }
 
 function load-key() {
-  local noop='false'
-  local slot
-  local filesystem
-  local zkey
-  local wrappedkey
-  local psph
+	local noop='false'
+	local slot
+	local filesystem
+	local zkey
+	local wrappedkey
+	local psph
 
-  while getopts np:s: name; do
-    case "$name" in
-      'p') psph="$OPTARG" ;;
-      'n') noop='true' ;;
-      's') slot="$OPTARG" ;;
-    esac
-  done
-  shift $(($OPTIND - 1))
-  filesystem="$1"
-  if [[ -z "$filesystem" ]]; then
-    echo 'Filesystem not specified.' >&2
-    exit 1
-  fi
-  shift
-  [[ $# -eq 0 ]] || echo "WARNING: '$1' and later arguments are ignored." >&2
-  [[ -z "$slot" ]] && slot="$DEFAULT_SLOT"
+	while getopts np:s: name; do
+		case "$name" in
+			'p') psph="$OPTARG" ;;
+			'n') noop='true' ;;
+			's') slot="$OPTARG" ;;
+		esac
+	done
+	shift $(($OPTIND - 1))
+	filesystem="$1"
+	if [[ -z "$filesystem" ]]; then
+		echo 'Filesystem not specified.' >&2
+		exit 1
+	fi
+	shift
+	[[ $# -eq 0 ]] || echo "WARNING: '$1' and later arguments are ignored." >&2
+	[[ -z "$slot" ]] && slot="$DEFAULT_SLOT"
 
-  if [[ '-' == "$psph" ]]; then
-    read psph
-  elif [[ 'prompt' == "$psph" ]]; then
-    while
-      read -s -p 'Enter passphrase: ' psph
-      printf '\n'
-      read -s -p 'Confirm passphrase: ' cpsph
-      printf '\n'
-      [[ "$psph" != "$cpsph" ]] && [[ -n "$psph" ]] # loop condition
-    do :; done
-  fi
+	if [[ '-' == "$psph" ]]; then
+		read psph
+	elif [[ 'prompt' == "$psph" ]]; then
+		while
+			read -s -p 'Enter passphrase: ' psph
+			printf '\n'
+			read -s -p 'Confirm passphrase: ' cpsph
+			printf '\n'
+			[[ "$psph" != "$cpsph" ]] && [[ -n "$psph" ]] # loop condition
+		do :; done
+	fi
 
-  zkey="$(unwrap "$filesystem" "$psph" "$slot")"
-  [[ $? == 0 ]] || exit $?
-  if $noop; then
-    echo "$zkey" | zfs load-key -n "$filesystem"
-  else
-    echo "$zkey" | zfs load-key "$filesystem"
-  fi
+	zkey="$(unwrap "$filesystem" "$psph" "$slot")"
+	[[ $? == 0 ]] || exit $?
+	if $noop; then
+		echo "$zkey" | zfs load-key -n "$filesystem"
+	else
+		echo "$zkey" | zfs load-key "$filesystem"
+	fi
 }
 
 function add-key() {
-  local slot # new slot
-  local uslot # slot to unwrap from
-  local filesystem
-  local iters
-  local psph
-  local cpsph
-  local wrappedkey
+	local slot # new slot
+	local uslot # slot to unwrap from
+	local filesystem
+	local iters
+	local psph
+	local cpsph
+	local wrappedkey
 
-  while getopts s:i:u: name; do
-    case "$name" in
-      's') slot="$OPTARG" ;;
-      'i') iters="$OPTARG" ;;
-      'u') uslot="$OPTARG" ;;
-      '*')
-        help
-        exit 1
-        ;;
-    esac
-  done
-  shift $(($OPTIND - 1))
-  filesystem="$1"
-  if [[ -z "$filesystem" ]]; then
-    echo 'Filesystem not specified.' >&2
-    exit 1
-  fi
-  shift
-  [[ $# -eq 0 ]] || echo "WARNING: '$1' and later arguments are ignored." >&2
-  if [[ -z "$slot" ]]; then
-    echo 'New slot not specified.' >&2
-    exit 1
-  fi
-  if [[ -z "$uslot" ]]; then
-    echo 'Slot to unwrap zfs key from not specified.' >&2
-    exit 1
-  fi
-  [[ -n "$iters" ]] || iters="$DEFAULT_ITERS"
+	while getopts s:i:u: name; do
+		case "$name" in
+			's') slot="$OPTARG" ;;
+			'i') iters="$OPTARG" ;;
+			'u') uslot="$OPTARG" ;;
+			'*')
+				help
+				exit 1
+				;;
+		esac
+	done
+	shift $(($OPTIND - 1))
+	filesystem="$1"
+	if [[ -z "$filesystem" ]]; then
+		echo 'Filesystem not specified.' >&2
+		exit 1
+	fi
+	shift
+	[[ $# -eq 0 ]] || echo "WARNING: '$1' and later arguments are ignored." >&2
+	if [[ -z "$slot" ]]; then
+		echo 'New slot not specified.' >&2
+		exit 1
+	fi
+	if [[ -z "$uslot" ]]; then
+		echo 'Slot to unwrap zfs key from not specified.' >&2
+		exit 1
+	fi
+	[[ -n "$iters" ]] || iters="$DEFAULT_ITERS"
 
-  read -s -p "Enter passphrase for slot '$uslot': " psph
-  zkey="$(unwrap "$filesystem" "$psph" "$uslot")"
-  [[ $? == 0 ]] || exit $?
-  echo "$zkey" | zfs load-key -n "$filesystem"
-  if [[ $? -ne 0 ]]; then
-    echo 'Incorrect passphrase provided.' >&2
-    exit 1
-  fi
+	read -s -p "Enter passphrase for slot '$uslot': " psph
+	zkey="$(unwrap "$filesystem" "$psph" "$uslot")"
+	[[ $? == 0 ]] || exit $?
+	echo "$zkey" | zfs load-key -n "$filesystem"
+	if [[ $? -ne 0 ]]; then
+		echo 'Incorrect passphrase provided.' >&2
+		exit 1
+	fi
 
-  while
-    read -s -p 'Enter passphrase: ' psph
-    printf '\n'
-    read -s -p 'Confirm passphrase: ' cpsph
-    printf '\n'
-    [[ "$psph" != "$cpsph" ]] && [[ -n "$psph" ]]
-  do :; done
+	while
+		read -s -p 'Enter passphrase: ' psph
+		printf '\n'
+		read -s -p 'Confirm passphrase: ' cpsph
+		printf '\n'
+		[[ "$psph" != "$cpsph" ]] && [[ -n "$psph" ]]
+	do :; done
 
-  wrappedkey="$(wrap "$zkey" "$psph" "$iters")"
-  wrap-and-add-key "$zkey" "$psph" "$slot" "$iters" "$filesystem"
+	wrappedkey="$(wrap "$zkey" "$psph" "$iters")"
+	wrap-and-add-key "$zkey" "$psph" "$slot" "$iters" "$filesystem"
 }
 
 function remove-slot() {
-  local slot
-  local filesystem
+	local slot
+	local filesystem
 
-  while getopts s: name; do
-    case "$name" in
-      's') slot="$OPTARG" ;;
-      '*')
-        help
-        exit 1
-        ;;
-    esac
-  done
-  shift $(($OPTIND - 1))
-  filesystem="$1"
-  if [[ -z "$filesystem" ]]; then
-    echo 'Filesystem not specified.' >&2
-    exit 1
-  fi
-  shift
-  [[ $# -eq 0 ]] || echo "WARNING: '$1' and later arguments are ignored." >&2
-  if [[ -z "$slot" ]]; then
-    echo 'Slot to remove not specified.' >&2
-    exit 1
-  fi
+	while getopts s: name; do
+		case "$name" in
+			's') slot="$OPTARG" ;;
+			'*')
+				help
+				exit 1
+				;;
+		esac
+	done
+	shift $(($OPTIND - 1))
+	filesystem="$1"
+	if [[ -z "$filesystem" ]]; then
+		echo 'Filesystem not specified.' >&2
+		exit 1
+	fi
+	shift
+	[[ $# -eq 0 ]] || echo "WARNING: '$1' and later arguments are ignored." >&2
+	if [[ -z "$slot" ]]; then
+		echo 'Slot to remove not specified.' >&2
+		exit 1
+	fi
 
-  if [[ $(list-slots "$filesystem" | wc -l) -lt 2 ]]; then
-    echo 'Refusing to remove last slot.' >&2
-    exit 1
-  fi
+	if [[ $(list-slots "$filesystem" | wc -l) -lt 2 ]]; then
+		echo 'Refusing to remove last slot.' >&2
+		exit 1
+	fi
 
-  zfs inherit "wrappedkey:$slot" "$filesystem"
-  zfs inherit "pbkdf2iters:$slot" "$filesystem"
+	zfs inherit "wrappedkey:$slot" "$filesystem"
+	zfs inherit "pbkdf2iters:$slot" "$filesystem"
 }
 
 function remove-key() {
-  :
+	:
 }
 
 function change-key() {
-  :
+	:
 }
 
 function list-slots() {
-  if [[ 1 != $# ]]; then
-    help
-    exit 1
-  fi
+	if [[ 1 != $# ]]; then
+		help
+		exit 1
+	fi
 
-  typeset filesystem="$1"
-  zfs get all "$filesystem" -Ho property \
-    | grep wrappedkey \
-    | cut -f 2 -d : \
-    | sort
+	typeset filesystem="$1"
+	zfs get all "$filesystem" -Ho property \
+		| grep wrappedkey \
+		| cut -f 2 -d : \
+		| sort
 }
 
 function wrap() {
-  local zkey="$1"
-  local psph="$2"
-  local iters="$3"
-  openssl $CIPHER \
-    -iter "$iters" \
-    -pass "pass:$psph" \
-    -base64 \
-    <<< "$zkey"
+	local zkey="$1"
+	local psph="$2"
+	local iters="$3"
+	openssl $CIPHER \
+		-iter "$iters" \
+		-pass "pass:$psph" \
+		-base64 \
+		<<< "$zkey"
 }
 
 function unwrap() {
-  local filesystem="$1"
-  local psph="$2"
-  local slot="$3"
-  local iters
-  iters="$(zfs get -Ho value pbkdf2iters:$slot $filesystem)"
-  [[ 0 == $? ]] || exit 1
-  if [[ '-' == "$iters" ]]; then
-    echo "slot '$slot' not found" >&2
-    exit 1
-  fi
-  zfs get -Ho value "wrappedkey:$slot" "$filesystem" \
-  | openssl $CIPHER \
-      -d \
-      -iter $iters \
-      -pass "pass:$psph" \
-      -base64
+	local filesystem="$1"
+	local psph="$2"
+	local slot="$3"
+	local iters
+	iters="$(zfs get -Ho value pbkdf2iters:$slot $filesystem)"
+	[[ 0 == $? ]] || exit 1
+	if [[ '-' == "$iters" ]]; then
+		echo "slot '$slot' not found" >&2
+		exit 1
+	fi
+	zfs get -Ho value "wrappedkey:$slot" "$filesystem" \
+	| openssl $CIPHER \
+			-d \
+			-iter $iters \
+			-pass "pass:$psph" \
+			-base64
 }
 
 function wrap-and-add-key() {
-  local zkey="$1"
-  local psph="$2"
-  local slot="$3"
-  local iters="$4"
-  local filesystem="$5"
-  local wrappedkey
+	local zkey="$1"
+	local psph="$2"
+	local slot="$3"
+	local iters="$4"
+	local filesystem="$5"
+	local wrappedkey
 
-  wrappedkey="$(wrap "$zkey" "$psph" "$iters")"
+	wrappedkey="$(wrap "$zkey" "$psph" "$iters")"
 
-  zfs set "pbkdf2iters:$slot=$iters" "$filesystem"
-  [[ 0 == $? ]] || exit 1
+	zfs set "pbkdf2iters:$slot=$iters" "$filesystem"
+	[[ 0 == $? ]] || exit 1
 
-  zfs set "wrappedkey:$slot=$wrappedkey" "$filesystem"
-  [[ 0 == $? ]] || exit 1
+	zfs set "wrappedkey:$slot=$wrappedkey" "$filesystem"
+	[[ 0 == $? ]] || exit 1
 }
 
 function parse_prop() {
-  # Assumed to be modifying the parameters from subcmd fn:
-  # - slot
-  # - keyformat
-  # - keylocation
-  # - pbkdf2iters
-  local tslot
-  local prop
-  local value
+	# Assumed to be modifying the parameters from subcmd fn:
+	# - slot
+	# - keyformat
+	# - keylocation
+	# - pbkdf2iters
+	local tslot
+	local prop
+	local value
 
-  if ! grep '=' <<< "$1"; then
-    echo "No value given for property in '$1'" >&2
-    exit 1
-  fi
+	if ! grep '=' <<< "$1"; then
+		echo "No value given for property in '$1'" >&2
+		exit 1
+	fi
 
-  value="${1#*=}" # $1 before '='
-  prop="${1%=*}"  # $1 after '='
-  tslot="${prop%@*}" # prop after '@' (or all of it, if '@' is not present)
+	value="${1#*=}" # $1 before '='
+	prop="${1%=*}"	# $1 after '='
+	tslot="${prop%@*}" # prop after '@' (or all of it, if '@' is not present)
 
-  if [[ "$tslot" == "$prop" ]]; then # '@' not found
-    tslot="${DEFAULT_SLOT}"
-  else
-    prop="${prop#*@}"
-  fi
+	if [[ "$tslot" == "$prop" ]]; then # '@' not found
+		tslot="${DEFAULT_SLOT}"
+	else
+		prop="${prop#*@}"
+	fi
 
-  if grep '@' <<< "$prop"; then
-    prop="${1%@*}"
-    tslot="$(echo "$1" | tr '@=' '\t' | cut -f 2)"
-  else
-    prop="${1%=*}"
-    tslot="${DEFAULT_SLOT}"
-  fi
+	if grep '@' <<< "$prop"; then
+		prop="${1%@*}"
+		tslot="$(echo "$1" | tr '@=' '\t' | cut -f 2)"
+	else
+		prop="${1%=*}"
+		tslot="${DEFAULT_SLOT}"
+	fi
 
-  if [[ -z "$slot" ]]; then
-    slot=$tslot
-  elif [[ "$tslot" != "$slot" ]]; then
-    echo 'Inconsistent slots given' >&2
-  fi
+	if [[ -z "$slot" ]]; then
+		slot=$tslot
+	elif [[ "$tslot" != "$slot" ]]; then
+		echo 'Inconsistent slots given' >&2
+	fi
 
-  case "$prop" in
-  'ms:keyformat')
-    if [[ -n "$keyformat" ]]; then
-      echo 'keyformat property given more than once' >&2
-      exit 1
-    fi
-    keyformat="$value"
-    ;;
-  'ms:keylocation')
-    if [[ -n "$keylocation" ]]; then
-      echo 'keylocation property given more than once' >&2
-      exit 1
-    fi
-    keylocation="$value"
-    ;;
-  'ms:pbkdf2iters')
-    if [[ -n "$pbkdf2iters" ]]; then
-      echo 'pbkdf2iters property given more than once' >&2
-      exit 1
-    fi
-    pbkdf2iters="$value"
-    ;;
-  *)
-    echo "Unknown value '$prop'" >@2
-    exit 1
-    ;;
-  esac
+	case "$prop" in
+	'ms:keyformat')
+		if [[ -n "$keyformat" ]]; then
+			echo 'keyformat property given more than once' >&2
+			exit 1
+		fi
+		keyformat="$value"
+		;;
+	'ms:keylocation')
+		if [[ -n "$keylocation" ]]; then
+			echo 'keylocation property given more than once' >&2
+			exit 1
+		fi
+		keylocation="$value"
+		;;
+	'ms:pbkdf2iters')
+		if [[ -n "$pbkdf2iters" ]]; then
+			echo 'pbkdf2iters property given more than once' >&2
+			exit 1
+		fi
+		pbkdf2iters="$value"
+		;;
+	*)
+		echo "Unknown value '$prop'" >@2
+		exit 1
+		;;
+	esac
 }
 
 main "$@"
+
+# vim: noexpandtab sts=8 sw=8 colorcolumn=81 textwidth=80
