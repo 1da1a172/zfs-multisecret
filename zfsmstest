@@ -1,16 +1,119 @@
 #!/bin/bash
 
-# setup
-typeset tmpdir="$(mktemp --directory --tmpdir zfsms.XXXXXXXX)"
-truncate "$tmpdir"/test.zpool --size 1G
-sudo zpool create -R "$tmpdir" ztest "$tmpdir/test.zpool"
-echo initzkey | sudo zfs create -o encryption=on -o keyformat=passphrase ztest/test
+typeset -r ZFSMS="${0%%/*}/zfsms"
+typeset -r TMPZPOOL='ztest'
+typeset -r INITKEY='initzkey'
+typeset -r TMPDS="$TMPZPOOL/test"
+typeset TMPDIR
+typeset USERKEY
 
-# test
-sudo ./zfsms convert -p asdfasdf ztest/test
-sudo ./zfsms load-key -n -s default -p asdfasdf ztest/test
-[[ "$(./zfsms list-slots ztest/test)" == "default" ]] || echo "list-slots failed" >&2
+function main() {
+	#run_test "test_convert_default"
+	#run_test "test_convert_slot"
+	#run_test "test_loadkey_default_nop"
+	#run_test "test_loadkey_default"
+	#run_test "test_listslots_default"
+	run_test "test_addkey"
+}
 
-# cleanup
-sudo zpool destroy ztest
-rm -rf $tmpdir
+############
+# Wrappers #
+############
+
+function run_test() {
+	setup
+	if "$1"; then
+		echo "passed: $1"
+	else
+		echo "failed: $1 (exit code: $?)"
+	fi
+	teardown
+}
+
+function setup() {
+	TMPDIR="$(mktemp --directory --tmpdir zfsms.XXXXXXXX)"
+	truncate "$TMPDIR"/test.zpool --size 1G
+	sudo zpool create \
+		-o altroot="$TMPDIR" \
+		-o cachefile="$TMPDIR/test.zcache" \
+		"$TMPZPOOL" \
+		"$TMPDIR/test.zpool"
+	sudo zfs create \
+		-o encryption=on \
+		-o keyformat=passphrase \
+		$TMPDS \
+		<<< "$INITKEY"
+}
+
+function teardown() {
+	sudo zpool destroy "$TMPZPOOL"
+	rm -rf "$TMPDIR"
+}
+
+#########
+# Tests #
+#########
+
+function test_convert_default() {
+	typeset wrapped_key
+	typeset iters
+	USERKEY='asdfasdf'
+
+	sudo "$ZFSMS" convert -p $USERKEY "$TMPDS"
+	wrapped_key="$(zfs get -Ho value wrappedkey:default	"$TMPDS")"
+	iters="$(zfs get -Ho value pbkdf2iters:default "$TMPDS")"
+
+	[[ "$wrapped_key" != "-" ]] && [[ "$iters" != "-" ]]
+}
+
+function test_convert_slot() {
+	typeset wrapped_key
+	typeset iters
+	typeset -r slot='slot1'
+
+	sudo "$ZFSMS" convert -s "$slot" -p asdfasdf "$TMPDS"
+	wrapped_key="$(zfs get -Ho value wrappedkey:"$slot"	"$TMPDS")"
+	iters="$(zfs get -Ho value pbkdf2iters:"$slot" "$TMPDS")"
+
+	[[ "$wrapped_key" != "-" ]] && [[ "$iters" != "-" ]]
+}
+
+function test_loadkey_default_nop() {
+	test_convert_default || return 2
+	sudo "$ZFSMS" load-key -n -p "$USERKEY" "$TMPDS" > /dev/null 2>&1
+}
+
+function test_loadkey_default() {
+	test_convert_default || return 2
+	sudo zfs umount $TMPZPOOL || return 3
+	sudo zfs unload-key $TMPDS || return 4
+	sudo "$ZFSMS" load-key -p "$USERKEY" "$TMPDS"
+}
+
+function test_listslots_default() {
+	test_convert_default || return 1
+	[[ "$($ZFSMS list-slots ztest/test)" == "default" ]]
+}
+
+function test_addkey() {
+	local expected
+	local actual
+
+	test_convert_default || return 1
+	expect <(cat <<- EOF
+		spawn sudo "$ZFSMS" add-key -s "slot2" -u "default" ztest/test
+		expect "Enter passphrase for *:" { send "$USERKEY\r" }
+		expect "Enter passphrase: " { send "foobarbaz\r" }
+		expect "Confirm passphrase: " { send "foobarbaz\r" }
+		EOF
+	) > /dev/null
+	expected="$(printf 'default\nslot2')"
+	actual="$("$ZFSMS" list-slots $TMPDS | sort)"
+	echo "$expected"
+	echo "$actual"
+	[[ "$expected" == "$actual" ]] || return 7
+}
+
+main "$@"
+
+# vim: noexpandtab sts=8 sw=8 colorcolumn=81 textwidth=80
