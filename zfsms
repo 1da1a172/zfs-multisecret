@@ -124,7 +124,7 @@ function convert() {
 }
 
 function load-key() {
-  local noop
+  local noop='false'
   local slot
   local filesystem
   local zkey
@@ -134,7 +134,7 @@ function load-key() {
   while getopts np:s: name; do
     case "$name" in
       'p') psph="$OPTARG" ;;
-      'n') noop="-n" ;;
+      'n') noop='true' ;;
       's') slot="$OPTARG" ;;
     esac
   done
@@ -162,7 +162,11 @@ function load-key() {
 
   zkey="$(unwrap "$filesystem" "$psph" "$slot")"
   [[ $? == 0 ]] || exit $?
-  echo "$zkey" | zfs load-key "$noop" "$filesystem"
+  if $noop; then
+    echo "$zkey" | zfs load-key -n "$filesystem"
+  else
+    echo "$zkey" | zfs load-key "$filesystem"
+  fi
 }
 
 function add-key() {
