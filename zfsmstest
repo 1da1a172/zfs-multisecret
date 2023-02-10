@@ -98,20 +98,27 @@ function test_listslots_default() {
 function test_addkey() {
 	local expected
 	local actual
+	local -r key2='zxcvfdsa'
 
 	test_convert_default || return 1
-	expect <(cat <<- EOF
-		spawn sudo "$ZFSMS" add-key -s "slot2" -u "default" ztest/test
-		expect "Enter passphrase for *:" { send "$USERKEY\r" }
-		expect "Enter passphrase: " { send "foobarbaz\r" }
-		expect "Confirm passphrase: " { send "foobarbaz\r" }
-		EOF
-	) > /dev/null
+	printf '%s\n%s\n%s\n' "$USERKEY" "$key2" "$key2" \
+		| sudo "$ZFSMS" add-key \
+			-s "slot2" \
+			-u "default" \
+			ztest/test \
+		> /dev/null || return 2
 	expected="$(printf 'default\nslot2')"
-	actual="$("$ZFSMS" list-slots $TMPDS | sort)"
-	echo "$expected"
-	echo "$actual"
-	[[ "$expected" == "$actual" ]] || return 7
+	actual="$("$ZFSMS" list-slots $TMPDS | sort)" || return 3
+	[[ "$expected" == "$actual" ]] || return 4
+
+	# These should probably be their own load-key test variations
+	sudo "$ZFSMS" load-key -n -s slot2 -p "$key2" "$TMPDS" \
+		> /dev/null \
+		|| return 5
+
+	sudo "$ZFSMS" load-key -n -s slot2 -p "$key2" "$TMPDS" \
+		> /dev/null \
+		|| return 6
 }
 
 main "$@"
