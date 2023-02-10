@@ -14,6 +14,7 @@ function main() {
 	#run_test "test_loadkey_default"
 	#run_test "test_listslots_default"
 	run_test "test_addkey"
+	run_test "test_removeslot"
 }
 
 ############
@@ -119,6 +120,25 @@ function test_addkey() {
 	sudo "$ZFSMS" load-key -n -s slot2 -p "$key2" "$TMPDS" \
 		> /dev/null \
 		|| return 6
+}
+
+function test_removeslot() {
+	local expected
+	local actual
+
+	test_addkey || return 1
+	sudo "$ZFSMS" remove-slot -s slot2 $TMPDS || return 2
+
+	expected='default'
+	actual="$("$ZFSMS" list-slots $TMPDS)"
+	[[ "$expected" == "$actual" ]] || return 3
+
+	expected='-'
+	actual="$(zfs get -Ho value "wrappedkey:slot2" "$TMPDS")"
+	[[ "$expected" == "$actual" ]] || return 4
+
+	actual="$(zfs get -Ho value "pbkdf2iters:slot2" "$TMPDS")"
+	[[ "$expected" == "$actual" ]] || return 5
 }
 
 main "$@"
