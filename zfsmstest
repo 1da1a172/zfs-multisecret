@@ -60,7 +60,7 @@ function test_convert_default() {
 	USERKEY='asdfasdf'
 
 	sudo "$ZFSMS" convert -p $USERKEY "$TMPDS"
-	wrapped_key="$(zfs get -Ho value wrappedkey:default	"$TMPDS")"
+	wrapped_key="$(zfs get -Ho value wrappedkey:default "$TMPDS")"
 	iters="$(zfs get -Ho value pbkdf2iters:default "$TMPDS")"
 
 	[[ "$wrapped_key" != "-" ]] && [[ "$iters" != "-" ]]
