@@ -6,6 +6,7 @@ typeset -r INITKEY='initzkey'
 typeset -r TMPDS="$TMPZPOOL/test"
 typeset TMPDIR
 typeset USERKEY
+typeset USERKEY2
 
 function main() {
 	run_test "test_convert_default"
@@ -15,6 +16,8 @@ function main() {
 	run_test "test_listslots_default"
 	run_test "test_addkey"
 	run_test "test_removeslot"
+	run_test "test_loadkey_explicit_slot2"
+	run_test "test_loadkey_implicit_slot2"
 }
 
 ############
@@ -91,6 +94,20 @@ function test_loadkey_default() {
 	sudo "$ZFSMS" load-key -p "$USERKEY" "$TMPDS"
 }
 
+function test_loadkey_explicit_slot2() {
+	test_addkey || return 1
+	sudo "$ZFSMS" load-key -n -s slot2 -p "$USERKEY2" "$TMPDS" \
+		> /dev/null \
+		|| return 2
+}
+
+function test_loadkey_implicit_slot2() {
+	test_addkey || return 1
+	sudo "$ZFSMS" load-key -n -p "$USERKEY2" "$TMPDS" \
+		> /dev/null \
+		|| return 2
+}
+
 function test_listslots_default() {
 	test_convert_default || return 1
 	[[ "$($ZFSMS list-slots ztest/test)" == "default" ]]
@@ -99,10 +116,10 @@ function test_listslots_default() {
 function test_addkey() {
 	local expected
 	local actual
-	local -r key2='zxcvfdsa'
+	USERKEY2='zxcvfdsa'
 
 	test_convert_default || return 1
-	printf '%s\n%s\n%s\n' "$USERKEY" "$key2" "$key2" \
+	printf '%s\n%s\n%s\n' "$USERKEY" "$USERKEY2" "$USERKEY2" \
 		| sudo "$ZFSMS" add-key \
 			-s "slot2" \
 			-u "default" \
@@ -111,15 +128,6 @@ function test_addkey() {
 	expected="$(printf 'default\nslot2')"
 	actual="$("$ZFSMS" list-slots $TMPDS | sort)" || return 3
 	[[ "$expected" == "$actual" ]] || return 4
-
-	# These should probably be their own load-key test variations
-	sudo "$ZFSMS" load-key -n -s slot2 -p "$key2" "$TMPDS" \
-		> /dev/null \
-		|| return 5
-
-	sudo "$ZFSMS" load-key -n -s slot2 -p "$key2" "$TMPDS" \
-		> /dev/null \
-		|| return 6
 }
 
 function test_removeslot() {
