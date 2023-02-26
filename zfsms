@@ -69,7 +69,7 @@ function convert() {
 				;;
 		esac
 	done
-	shift $(($OPTIND - 1))
+	shift $((OPTIND - 1))
 	filesystem="$1"
 	if [[ -z "$filesystem" ]]; then
 		echo 'Filesystem not specified.' >&2
@@ -136,9 +136,13 @@ function load-key() {
 			'p') psph="$OPTARG" ;;
 			'n') noop='true' ;;
 			's') slot="$OPTARG" ;;
+			*)
+				help
+				exit 1
+				;;
 		esac
 	done
-	shift $(($OPTIND - 1))
+	shift $((OPTIND - 1))
 	filesystem="$1"
 	if [[ -z "$filesystem" ]]; then
 		echo 'Filesystem not specified.' >&2
@@ -189,7 +193,7 @@ function add-key() {
 				;;
 		esac
 	done
-	shift $(($OPTIND - 1))
+	shift $((OPTIND - 1))
 	filesystem="$1"
 	if [[ -z "$filesystem" ]]; then
 		echo 'Filesystem not specified.' >&2
@@ -241,7 +245,7 @@ function remove-slot() {
 				;;
 		esac
 	done
-	shift $(($OPTIND - 1))
+	shift $((OPTIND - 1))
 	filesystem="$1"
 	if [[ -z "$filesystem" ]]; then
 		echo 'Filesystem not specified.' >&2
