@@ -19,6 +19,7 @@ function main() {
 	run_test "test_loadkey_explicit_slot2"
 	run_test "test_loadkey_implicit_slot2"
 	run_test "test_fail_remove_last_slot"
+	run_test "test_removekey"
 }
 
 ############
@@ -166,6 +167,10 @@ function test_fail_remove_last_slot() {
 	if [[ "$(zfs get -Ho value "pbkdf2iters:default")" == '-' ]]; then
 		return 3
 	fi
+}
+
+function test_removekey() {
+	false
 }
 
 main "$@"
