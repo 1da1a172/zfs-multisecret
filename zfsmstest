@@ -86,33 +86,29 @@ function test_convert_slot() {
 }
 
 function test_loadkey_default_nop() {
-	test_convert_default || return 2
+	test_convert_default || return 128
 	sudo "$ZFSMS" load-key -n -p "$USERKEY" "$TMPDS" > /dev/null 2>&1
 }
 
 function test_loadkey_default() {
-	test_convert_default || return 2
-	sudo zfs umount $TMPZPOOL || return 3
-	sudo zfs unload-key $TMPDS || return 4
+	test_convert_default || return 128
+	sudo zfs umount $TMPZPOOL || return 129
+	sudo zfs unload-key $TMPDS || return 130
 	sudo "$ZFSMS" load-key -p "$USERKEY" "$TMPDS"
 }
 
 function test_loadkey_explicit_slot2() {
-	test_addkey || return 1
-	sudo "$ZFSMS" load-key -n -s slot2 -p "$USERKEY2" "$TMPDS" \
-		> /dev/null \
-		|| return 2
+	test_addkey || return 128
+	sudo "$ZFSMS" load-key -n -s slot2 -p "$USERKEY2" "$TMPDS" > /dev/null
 }
 
 function test_loadkey_implicit_slot2() {
-	test_addkey || return 1
-	sudo "$ZFSMS" load-key -n -p "$USERKEY2" "$TMPDS" \
-		> /dev/null \
-		|| return 2
+	test_addkey || return 128
+	sudo "$ZFSMS" load-key -n -p "$USERKEY2" "$TMPDS" > /dev/null
 }
 
 function test_listslots_default() {
-	test_convert_default || return 1
+	test_convert_default || return 128
 	[[ "$($ZFSMS list-slots ztest/test)" == "default" ]]
 }
 
@@ -121,35 +117,36 @@ function test_addkey() {
 	local actual
 	USERKEY2='zxcvfdsa'
 
-	test_convert_default || return 1
+	test_convert_default || return 128
 	printf '%s\n%s\n%s\n' "$USERKEY" "$USERKEY2" "$USERKEY2" \
 		| sudo "$ZFSMS" add-key \
 			-s "slot2" \
 			-u "default" \
 			ztest/test \
-		> /dev/null || return 2
+		> /dev/null \
+		|| return 129
 	expected="$(printf 'default\nslot2')"
-	actual="$("$ZFSMS" list-slots $TMPDS | sort)" || return 3
-	[[ "$expected" == "$actual" ]] || return 4
+	actual="$("$ZFSMS" list-slots $TMPDS | sort)" || return 130
+	[[ "$expected" == "$actual" ]]
 }
 
 function test_removeslot() {
 	local expected
 	local actual
 
-	test_addkey || return 1
-	sudo "$ZFSMS" remove-slot -s slot2 $TMPDS || return 2
+	test_addkey || return 128
+	sudo "$ZFSMS" remove-slot -s slot2 $TMPDS || return 129
 
 	expected='default'
 	actual="$("$ZFSMS" list-slots $TMPDS)"
-	[[ "$expected" == "$actual" ]] || return 3
+	[[ "$expected" == "$actual" ]] || return 130
 
 	expected='-'
 	actual="$(zfs get -Ho value "wrappedkey:slot2" "$TMPDS")"
-	[[ "$expected" == "$actual" ]] || return 4
+	[[ "$expected" == "$actual" ]] || return 1
 
 	actual="$(zfs get -Ho value "pbkdf2iters:slot2" "$TMPDS")"
-	[[ "$expected" == "$actual" ]] || return 5
+	[[ "$expected" == "$actual" ]] || return 2
 }
 
 main "$@"
