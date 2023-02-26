@@ -25,11 +25,14 @@ function main() {
 ############
 
 function run_test() {
+	local -r red='\033[33;31m'
+	local -r green='\033[33;32m'
+	local -r reset='\e[0m'
 	setup
 	if "$1"; then
-		echo "passed: $1"
+		printf "${green}passed${reset}: %s\n" "$1"
 	else
-		echo "failed: $1 (exit code: $?)"
+		printf "${red}failed${reset}: %s (exit code: %d)\n" "$1" $?
 	fi
 	teardown
 }
