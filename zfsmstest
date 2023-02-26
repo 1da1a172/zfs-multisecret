@@ -18,6 +18,7 @@ function main() {
 	run_test "test_removeslot"
 	run_test "test_loadkey_explicit_slot2"
 	run_test "test_loadkey_implicit_slot2"
+	run_test "test_fail_remove_last_slot"
 }
 
 ############
@@ -147,6 +148,24 @@ function test_removeslot() {
 
 	actual="$(zfs get -Ho value "pbkdf2iters:slot2" "$TMPDS")"
 	[[ "$expected" == "$actual" ]] || return 2
+}
+
+function test_fail_remove_last_slot() {
+	local expected
+	local actual
+
+	test_convert_default || return 128
+	if sudo "$ZFSMS" remove-slot -s default "$TMPDS" > /dev/null 2>&1; then
+		return 1
+	fi
+
+	if [[ "$(zfs get -Ho value "wrappedkey:default")" == '-' ]]; then
+		return 2
+	fi
+
+	if [[ "$(zfs get -Ho value "pbkdf2iters:default")" == '-' ]]; then
+		return 3
+	fi
 }
 
 main "$@"
