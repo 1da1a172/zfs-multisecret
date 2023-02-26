@@ -79,9 +79,8 @@ function convert() {
 	[[ $# -eq 0 ]] || echo "WARNING: '$1' and later arguments are ignored." >&2
 	[[ -n "$slot" ]] || slot="$DEFAULT_SLOT"
 
-	keystatus="$(zfs get -Ho value keystatus $filesystem)"
-	encroot="$(zfs get -Ho value encryptionroot $filesystem)"
-	[[ 0 == $? ]] || exit 1 # the above would already give an error msg
+	keystatus="$(zfs get -Ho value keystatus "$filesystem")" || exit 1
+	encroot="$(zfs get -Ho value encryptionroot "$filesystem")" || exit 1
 
 	if [[ '-' == "$keystatus" ]]; then
 		echo "Dataset '$1' is not encrypted" >&2
@@ -164,8 +163,7 @@ function load-key() {
 		do :; done
 	fi
 
-	zkey="$(unwrap "$filesystem" "$psph" "$slot")"
-	[[ $? == 0 ]] || exit $?
+	zkey="$(unwrap "$filesystem" "$psph" "$slot")" || exit $?
 	if $noop; then
 		echo "$zkey" | zfs load-key -n "$filesystem"
 	else
@@ -212,10 +210,8 @@ function add-key() {
 	[[ -n "$iters" ]] || iters="$DEFAULT_ITERS"
 
 	read -s -p "Enter passphrase for slot '$uslot': " psph
-	zkey="$(unwrap "$filesystem" "$psph" "$uslot")"
-	[[ $? == 0 ]] || exit $?
-	echo "$zkey" | zfs load-key -n "$filesystem"
-	if [[ $? -ne 0 ]]; then
+	zkey="$(unwrap "$filesystem" "$psph" "$uslot")" || exit $?
+	if ! zfs load-key -n "$filesystem" <<< "$zkey"; then
 		echo 'Incorrect passphrase provided.' >&2
 		exit 1
 	fi
@@ -304,8 +300,7 @@ function unwrap() {
 	local psph="$2"
 	local slot="$3"
 	local iters
-	iters="$(zfs get -Ho value pbkdf2iters:$slot $filesystem)"
-	[[ 0 == $? ]] || exit 1
+	iters="$(zfs get -Ho value "pbkdf2iters:$slot" "$filesystem")" || exit 1
 	if [[ '-' == "$iters" ]]; then
 		echo "slot '$slot' not found" >&2
 		exit 1
@@ -328,11 +323,8 @@ function wrap-and-add-key() {
 
 	wrappedkey="$(wrap "$zkey" "$psph" "$iters")"
 
-	zfs set "pbkdf2iters:$slot=$iters" "$filesystem"
-	[[ 0 == $? ]] || exit 1
-
-	zfs set "wrappedkey:$slot=$wrappedkey" "$filesystem"
-	[[ 0 == $? ]] || exit 1
+	zfs set "pbkdf2iters:$slot=$iters" "$filesystem" || exit 1
+	zfs set "wrappedkey:$slot=$wrappedkey" "$filesystem" || exit 1
 }
 
 function parse_prop() {
