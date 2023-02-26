@@ -100,13 +100,13 @@ function convert() {
 	if [[ '-' == "$psph" ]]; then
 		read -r psph
 	elif [[ 'prompt' == "$psph" ]]; then
-		while
+		while true; do
 			read -s -r -p 'Enter passphrase: ' psph
 			printf '\n'
 			read -s -r -p 'Confirm passphrase: ' cpsph
 			printf '\n'
-			[[ "$psph" != "$cpsph" ]] && [[ -n "$psph" ]] # loop condition
-		do :; done
+			[[ "$psph" != "$cpsph" && -n "$psph" ]] || break
+		done
 	fi
 
 	iters="$(zfs get -Ho value pbkdf2iters "$filesystem")"
@@ -154,13 +154,13 @@ function load-key() {
 	if [[ '-' == "$psph" ]]; then
 		read -r psph
 	elif [[ 'prompt' == "$psph" ]]; then
-		while
+		while true; do
 			read -s -r -p 'Enter passphrase: ' psph
 			printf '\n'
 			read -s -r -p 'Confirm passphrase: ' cpsph
 			printf '\n'
-			[[ "$psph" != "$cpsph" ]] && [[ -n "$psph" ]] # loop condition
-		do :; done
+			[[ "$psph" != "$cpsph" && -n "$psph" ]] || break
+		done
 	fi
 
 	zkey="$(unwrap "$filesystem" "$psph" "$slot")" || exit $?
@@ -216,13 +216,13 @@ function add-key() {
 		exit 1
 	fi
 
-	while
+	while true; do
 		read -s -r -p 'Enter passphrase: ' psph
 		printf '\n'
 		read -s -r -p 'Confirm passphrase: ' cpsph
 		printf '\n'
-		[[ "$psph" != "$cpsph" ]] && [[ -n "$psph" ]]
-	do :; done
+		[[ "$psph" != "$cpsph" && -n "$psph" ]] || break
+	done
 
 	wrappedkey="$(wrap "$zkey" "$psph" "$iters")"
 	wrap-and-add-key "$zkey" "$psph" "$slot" "$iters" "$filesystem"
