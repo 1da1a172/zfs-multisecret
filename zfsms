@@ -98,12 +98,12 @@ function convert() {
 
 	[[ -z "$slot" ]] && slot=$DEFAULT_SLOT
 	if [[ '-' == "$psph" ]]; then
-		read psph
+		read -r psph
 	elif [[ 'prompt' == "$psph" ]]; then
 		while
-			read -s -p 'Enter passphrase: ' psph
+			read -s -r -p 'Enter passphrase: ' psph
 			printf '\n'
-			read -s -p 'Confirm passphrase: ' cpsph
+			read -s -r -p 'Confirm passphrase: ' cpsph
 			printf '\n'
 			[[ "$psph" != "$cpsph" ]] && [[ -n "$psph" ]] # loop condition
 		do :; done
@@ -152,12 +152,12 @@ function load-key() {
 	[[ -z "$slot" ]] && slot="$DEFAULT_SLOT"
 
 	if [[ '-' == "$psph" ]]; then
-		read psph
+		read -r psph
 	elif [[ 'prompt' == "$psph" ]]; then
 		while
-			read -s -p 'Enter passphrase: ' psph
+			read -s -r -p 'Enter passphrase: ' psph
 			printf '\n'
-			read -s -p 'Confirm passphrase: ' cpsph
+			read -s -r -p 'Confirm passphrase: ' cpsph
 			printf '\n'
 			[[ "$psph" != "$cpsph" ]] && [[ -n "$psph" ]] # loop condition
 		do :; done
@@ -209,7 +209,7 @@ function add-key() {
 	fi
 	[[ -n "$iters" ]] || iters="$DEFAULT_ITERS"
 
-	read -s -p "Enter passphrase for slot '$uslot': " psph
+	read -s -r -p "Enter passphrase for slot '$uslot': " psph
 	zkey="$(unwrap "$filesystem" "$psph" "$uslot")" || exit $?
 	if ! zfs load-key -n "$filesystem" <<< "$zkey"; then
 		echo 'Incorrect passphrase provided.' >&2
@@ -217,9 +217,9 @@ function add-key() {
 	fi
 
 	while
-		read -s -p 'Enter passphrase: ' psph
+		read -s -r -p 'Enter passphrase: ' psph
 		printf '\n'
-		read -s -p 'Confirm passphrase: ' cpsph
+		read -s -r -p 'Confirm passphrase: ' cpsph
 		printf '\n'
 		[[ "$psph" != "$cpsph" ]] && [[ -n "$psph" ]]
 	do :; done
