@@ -109,7 +109,7 @@ function convert() {
 		do :; done
 	fi
 
-	iters="$(zfs get -Ho value pbkdf2iters $filesystem)"
+	iters="$(zfs get -Ho value pbkdf2iters "$filesystem")"
 	[[ 0 == "$iters" ]] && iters="$DEFAULT_ITERS"
 
 	zkey="$(dd if=/dev/random status=none bs=32 count=1 | xxd -p -c 0)"
@@ -272,7 +272,7 @@ function change-key() {
 }
 
 function list-slots() {
-	if [[ 1 != $# ]]; then
+	if [[ 1 != "$#" ]]; then
 		help
 		exit 1
 	fi
@@ -306,9 +306,9 @@ function unwrap() {
 		exit 1
 	fi
 	zfs get -Ho value "wrappedkey:$slot" "$filesystem" \
-	| openssl $CIPHER \
+		| openssl $CIPHER \
 			-d \
-			-iter $iters \
+			-iter "$iters" \
 			-pass "pass:$psph" \
 			-base64
 }
