@@ -123,7 +123,7 @@ function test_addkey() {
 		| sudo "$ZFSMS" add-key \
 			-s "slot2" \
 			-u "default" \
-			ztest/test \
+			"$TMPDS" \
 		> /dev/null \
 		|| return 129
 	expected="$(printf 'default\nslot2')"
