@@ -160,8 +160,10 @@ function test_fail_remove_last_slot() {
 	sudo "$ZFSMS" remove-slot -s default "$TMPDS" \
 		> /dev/null 2>&1 \
 		&& return 1
-	[[ "$(zfs get -Ho value "wrappedkey:default")" == '-' ]] && return 2
-	[[ "$(zfs get -Ho value "pbkdf2iters:default")" == '-' ]] && return 3
+	[[ "$(zfs get -Ho value "wrappedkey:default" "$TMPDS")" != '-' ]] \
+		|| return 2
+	[[ "$(zfs get -Ho value "pbkdf2iters:default" "$TMPDS")" != '-' ]] \
+		|| return 3
 }
 
 function test_removekey() {
