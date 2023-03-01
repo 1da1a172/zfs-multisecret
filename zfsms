@@ -149,18 +149,16 @@ function load-key() {
 	fi
 	shift
 	[[ $# -eq 0 ]] || echo "WARNING: '$1' and later arguments are ignored." >&2
-	[[ -z "$slot" ]] && slot="$DEFAULT_SLOT"
 
 	if [[ '-' == "$psph" ]]; then
 		read -r psph
 	elif [[ 'prompt' == "$psph" ]]; then
-		while true; do
-			read -s -r -p 'Enter passphrase: ' psph
-			printf '\n'
-			read -s -r -p 'Confirm passphrase: ' cpsph
-			printf '\n'
-			[[ "$psph" != "$cpsph" && -n "$psph" ]] || break
-		done
+		read -s -r -p 'Enter passphrase: ' psph
+		printf '\n'
+	fi
+
+	if [[ -z "$slot" ]]; then
+		slot="$(match_slot "$filesystem" "$psph")"
 	fi
 
 	zkey="$(unwrap "$filesystem" "$psph" "$slot")" || exit $?
@@ -393,6 +391,20 @@ function parse_prop() {
 		exit 1
 		;;
 	esac
+}
+
+# prints the slot, given key
+function match_slot() {
+	local filesystem="$1"
+	local psph="$2"
+	for slot in $(list-slots "$filesystem"); do
+		if unwrap "$filesystem" "$psph" "$slot" \
+			| zfs load-key -n "$filesystem" > /dev/null 2>&1; then
+			echo "$slot"
+			return 0
+		fi
+	done
+	false
 }
 
 main "$@"
