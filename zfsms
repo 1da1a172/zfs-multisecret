@@ -409,4 +409,4 @@ function match_slot() {
 
 main "$@"
 
-# vim: noexpandtab sts=8 sw=8 colorcolumn=81 textwidth=80
+# vim: noexpandtab sts=8 sw=8 colorcolumn=81 textwidth=80 foldmethod=indent
