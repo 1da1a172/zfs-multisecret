@@ -59,6 +59,10 @@ function teardown() {
 	rm -rf "$TMPDIR"
 }
 
+function getprop() {
+	zfs get -Ho value "$1" "$TMPDS"
+}
+
 #########
 # Tests #
 #########
@@ -69,8 +73,8 @@ function test_convert_default() {
 	USERKEY='asdfasdf'
 
 	sudo "$ZFSMS" convert -p $USERKEY "$TMPDS"
-	wrapped_key="$(zfs get -Ho value wrappedkey:default "$TMPDS")"
-	iters="$(zfs get -Ho value pbkdf2iters:default "$TMPDS")"
+	wrapped_key="$(getprop wrappedkey:default)"
+	iters="$(getprop pbkdf2iters:default)"
 
 	[[ "$wrapped_key" != "-" ]] && [[ "$iters" != "-" ]]
 }
@@ -81,8 +85,8 @@ function test_convert_slot() {
 	typeset -r slot='slot1'
 
 	sudo "$ZFSMS" convert -s "$slot" -p asdfasdf "$TMPDS"
-	wrapped_key="$(zfs get -Ho value wrappedkey:"$slot"	"$TMPDS")"
-	iters="$(zfs get -Ho value pbkdf2iters:"$slot" "$TMPDS")"
+	wrapped_key="$(getprop wrappedkey:"$slot")"
+	iters="$(getprop  pbkdf2iters:"$slot")"
 
 	[[ "$wrapped_key" != "-" ]] && [[ "$iters" != "-" ]]
 }
@@ -144,10 +148,10 @@ function test_removeslot() {
 	[[ "$expected" == "$actual" ]] || return 130
 
 	expected='-'
-	actual="$(zfs get -Ho value "wrappedkey:slot2" "$TMPDS")"
+	actual="$(getprop  "wrappedkey:slot2")"
 	[[ "$expected" == "$actual" ]] || return 1
 
-	actual="$(zfs get -Ho value "pbkdf2iters:slot2" "$TMPDS")"
+	actual="$(getprop "pbkdf2iters:slot2")"
 	[[ "$expected" == "$actual" ]] || return 2
 }
 
@@ -160,10 +164,8 @@ function test_fail_remove_last_slot() {
 	sudo "$ZFSMS" remove-slot -s default "$TMPDS" \
 		> /dev/null 2>&1 \
 		&& return 1
-	[[ "$(zfs get -Ho value "wrappedkey:default" "$TMPDS")" != '-' ]] \
-		|| return 2
-	[[ "$(zfs get -Ho value "pbkdf2iters:default" "$TMPDS")" != '-' ]] \
-		|| return 3
+	[[ "$(getprop "wrappedkey:default")" != '-' ]] || return 2
+	[[ "$(getprop "pbkdf2iters:default")" != '-' ]] || return 3
 }
 
 function test_removekey() {
