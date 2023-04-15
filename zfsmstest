@@ -19,7 +19,8 @@ function main() {
 	run_test "test_loadkey_explicit_slot2"
 	run_test "test_loadkey_implicit_slot2"
 	run_test "test_fail_remove_last_slot"
-	run_test "test_removekey"
+	run_test "test_removekey1"
+	run_test "test_removekey2"
 }
 
 ############
@@ -72,7 +73,7 @@ function test_convert_default() {
 	typeset iters
 	USERKEY='asdfasdf'
 
-	sudo "$ZFSMS" convert -p $USERKEY "$TMPDS"
+	sudo "$ZFSMS" convert -L prompt "$TMPDS" <<< "$USERKEY"
 	wrapped_key="$(getprop wrappedkey:default)"
 	iters="$(getprop pbkdf2iters:default)"
 
@@ -84,33 +85,33 @@ function test_convert_slot() {
 	typeset iters
 	typeset -r slot='slot1'
 
-	sudo "$ZFSMS" convert -s "$slot" -p asdfasdf "$TMPDS"
+	sudo "$ZFSMS" convert -s "$slot" "$TMPDS" <<< asdfasdf
 	wrapped_key="$(getprop wrappedkey:"$slot")"
-	iters="$(getprop  pbkdf2iters:"$slot")"
+	iters="$(getprop pbkdf2iters:"$slot")"
 
 	[[ "$wrapped_key" != "-" ]] && [[ "$iters" != "-" ]]
 }
 
 function test_loadkey_default_nop() {
 	test_convert_default || return 128
-	sudo "$ZFSMS" load-key -n -p "$USERKEY" "$TMPDS" > /dev/null 2>&1
+	sudo "$ZFSMS" load-key -n "$TMPDS" > /dev/null 2>&1 <<< "$USERKEY"
 }
 
 function test_loadkey_default() {
 	test_convert_default || return 128
 	sudo zfs umount $TMPZPOOL || return 129
 	sudo zfs unload-key $TMPDS || return 130
-	sudo "$ZFSMS" load-key -p "$USERKEY" "$TMPDS"
+	sudo "$ZFSMS" load-key "$TMPDS" <<< "$USERKEY"
 }
 
 function test_loadkey_explicit_slot2() {
 	test_addkey || return 128
-	sudo "$ZFSMS" load-key -n -s slot2 -p "$USERKEY2" "$TMPDS" > /dev/null
+	sudo "$ZFSMS" load-key -n -s slot2 "$TMPDS" > /dev/null <<< "$USERKEY2"
 }
 
 function test_loadkey_implicit_slot2() {
 	test_addkey || return 128
-	sudo "$ZFSMS" load-key -n -p "$USERKEY2" "$TMPDS" > /dev/null
+	sudo "$ZFSMS" load-key -n "$TMPDS" > /dev/null <<< "$USERKEY2"
 }
 
 function test_listslots_default() {
@@ -124,15 +125,15 @@ function test_addkey() {
 	USERKEY2='zxcvfdsa'
 
 	test_convert_default || return 128
-	printf '%s\n%s\n%s\n' "$USERKEY" "$USERKEY2" "$USERKEY2" \
+	printf '%s\n%s\n' "$USERKEY" "$USERKEY2" \
 		| sudo "$ZFSMS" add-key \
 			-s "slot2" \
 			-u "default" \
 			"$TMPDS" \
 		> /dev/null \
-		|| return 129
+		|| return $?
 	expected="$(printf 'default\nslot2')"
-	actual="$("$ZFSMS" list-slots $TMPDS | sort)" || return 130
+	actual="$("$ZFSMS" list-slots "$TMPDS" | sort)" || return 127
 	[[ "$expected" == "$actual" ]]
 }
 
@@ -168,8 +169,42 @@ function test_fail_remove_last_slot() {
 	[[ "$(getprop "pbkdf2iters:default")" != '-' ]] || return 3
 }
 
-function test_removekey() {
-	false
+function test_removekey1() {
+	local expected
+	local actual
+
+	test_addkey || return 128
+	sudo "$ZFSMS" remove-key "$TMPDS" <<< "$USERKEY" || return $?
+
+	expected='slot2'
+	actual="$("$ZFSMS" list-slots "$TMPDS")" || return 129
+	[[ "$expected" == "$actual" ]] || return 127
+
+	expected='-'
+	actual="$(getprop "wrappedkey:default")"
+	[[ "$expected" == "$actual" ]] || return 126
+
+	actual="$(getprop "pbkdf2iters:default")"
+	[[ "$expected" == "$actual" ]] || return 125
+}
+
+function test_removekey2() {
+	local expected
+	local actual
+
+	test_addkey || return 128
+	sudo "$ZFSMS" remove-key "$TMPDS" <<< "$USERKEY2" || return $?
+
+	expected='default'
+	actual="$("$ZFSMS" list-slots "$TMPDS")" || return 129
+	[[ "$expected" == "$actual" ]] || return 127
+
+	expected='-'
+	actual="$(getprop "wrappedkey:slot2")"
+	[[ "$expected" == "$actual" ]] || return 126
+
+	actual="$(getprop "pbkdf2iters:slot2")"
+	[[ "$expected" == "$actual" ]] || return 125
 }
 
 main "$@"
