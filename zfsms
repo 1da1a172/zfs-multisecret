@@ -158,7 +158,7 @@ function load-key() {
 		slot="$(match-slot "$filesystem" "$ukey")" || exit $?
 	fi
 
-	zkey="$(unwrap "$filesystem" "$ukey" "$slot")" || exit $?
+	zkey="$(fetch-and-unwrap "$filesystem" "$ukey" "$slot")" || exit $?
 	if $noop; then
 		echo "$zkey" | zfs load-key -n "$filesystem"
 	else
@@ -215,7 +215,7 @@ function add-key() {
 			"keylocation:$uslot" \
 			"$filesystem")"
 	old_user_key="$(get-user-key "$old_user_key_location")"
-	zkey="$(unwrap \
+	zkey="$(fetch-and-unwrap \
 		"$filesystem" \
 		"$old_user_key" \
 		"$uslot")"
@@ -322,37 +322,27 @@ function wrap() {
 	local zkey="$1"
 	local psph="$2"
 	local iters="$3"
-	openssl $CIPHER \
-		-iter "$iters" \
-		-pass "pass:$psph" \
-		-base64 \
-		<<< "$zkey"
+
+	echo "$zkey" \
+		| openssl $CIPHER \
+			-iter "$iters" \
+			-pass "pass:$psph" \
+		| base64 -w 0
 }
 
 function unwrap() {
-	local filesystem="$1"
+	local wrapped="$1"
 	local ukey="$2"
-	local slot="$3"
-	local iters
-	local wrapped
-	local key
-	iters="$(zfs get -Ho value "pbkdf2iters:$slot" "$filesystem")" || exit 1
-	if [[ '-' == "$iters" ]]; then
-		echo "slot '$slot' not found" >&2
-		exit 1
-	fi
-	wrapped="$(zfs get -Ho value "wrappedkey:$slot" "$filesystem")"
-	if [[ '-' == "$wrapped" ]]; then
-		echo "slot '$slot' malformed" >&2
-		exit 1
-	fi
-	key="$(openssl $CIPHER \
-		-d \
-		-iter "$iters" \
-		-pass "pass:$ukey" \
-		-base64 \
-		<<< "$wrapped")"
-	if [[ 65 != $(wc -m <<< "$key") ]]; then
+	local iters="$3"
+
+	key="$(echo "$wrapped" \
+		| base64 -d \
+		| openssl $CIPHER \
+			-d \
+			-iter "$iters" \
+			-pass "pass:$ukey")"
+
+	if [[ 64 != $(echo -n "$key" | wc -m) ]]; then
 		return 1
 	fi
 	printf '%s' "$key"
@@ -374,13 +364,35 @@ function wrap-and-add-key() {
 	zfs set "keylocation:$slot=$loc" "$filesystem" || exit 1
 }
 
+function fetch-and-unwrap() {
+	local filesystem="$1"
+	local ukey="$2"
+	local slot="$3"
+	local iters
+	local wrapped
+	local zkey
+
+	iters="$(zfs get -Ho value "pbkdf2iters:$slot" "$filesystem")" || exit 1
+	if [[ '-' == "$iters" ]]; then
+		echo "slot '$slot' malformed"  >&2
+		exit 1
+	fi
+	wrapped="$(zfs get -Ho value "wrappedkey:$slot" "$filesystem")" || exit 1
+	if [[ '-' == "$wrapped" ]]; then
+		echo "slot '$slot' malformed"  >&2
+		exit 1
+	fi
+
+	unwrap "$wrapped" "$ukey" "$iters"
+}
+
 # prints the slot, given key
 function match-slot() {
 	local filesystem="$1"
 	local ukey="$2"
 	local key
 	for slot in $(list-slots "$filesystem"); do
-		key="$(unwrap "$filesystem" "$ukey" "$slot")" || continue
+		key="$(fetch-and-unwrap "$filesystem" "$ukey" "$slot")" || continue
 		if zfs load-key -n "$filesystem" > /dev/null 2>&1 <<< "$key"; then
 			printf '%s' "$slot"
 			return 0
