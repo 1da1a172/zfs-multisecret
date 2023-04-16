@@ -61,7 +61,7 @@ function teardown() {
 	local expected
 	local actual
 
-	if zfs list "$TMPZPOOL" > /dev/null; then
+	if zfs list "$TMPZPOOL" > /dev/null 2>&1; then
 		actual="$(zfs get -Ho value mountpoint "$TMPZPOOL")"
 		if [[ "$actual" == /tmp/zfsms.????????/$TMPZPOOL ]]; then
 			sudo zpool destroy "$TMPZPOOL"
