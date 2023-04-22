@@ -213,9 +213,9 @@ function add-key() {
 
 	printf 'Getting the user key for slot "%s"\n' "$uslot"
 	old_user_key_location="$(zfs get \
-			-Ho value \
-			"keylocation:$uslot" \
-			"$filesystem")"
+		-Ho value \
+		"keylocation:$uslot" \
+		"$filesystem")"
 	old_user_key="$(get-user-key "$old_user_key_location")"
 	zkey="$(fetch-and-unwrap \
 		"$filesystem" \
