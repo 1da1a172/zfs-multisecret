@@ -154,6 +154,7 @@ function load-key() {
 	[[ -n "$loc" ]] || loc='prompt'
 	ukey="$(get-user-key "$loc")"
 
+	# TODO: don't repeat work
 	if [[ -z "$slot" ]]; then
 		slot="$(match-slot "$filesystem" "$ukey")" || exit $?
 	fi
