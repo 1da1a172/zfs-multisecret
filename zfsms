@@ -337,17 +337,13 @@ function unwrap() {
 	local ukey="$2"
 	local iters="$3"
 
-	key="$(echo "$wrapped" \
+	echo "$wrapped" \
 		| base64 -d \
 		| openssl $CIPHER \
 			-d \
 			-iter "$iters" \
-			-pass "pass:$ukey")"
-
-	if [[ 64 != $(echo -n "$key" | wc -m) ]]; then
-		return 1
-	fi
-	printf '%s' "$key"
+			-pass "pass:$ukey" \
+		| grep '^[[:xdigit:]]\{64\}$'
 }
 
 function wrap-and-add-key() {
