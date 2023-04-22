@@ -414,7 +414,7 @@ function get-user-key() {
 		echo "$ukey"
 		;;
 	file://* | https://* | http://*)
-		curl "$keylocation"
+		curl -s "$keylocation"
 		;;
 	*)
 		printf 'Unknown key location: %s\n' "$keylocation" >&2
