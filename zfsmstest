@@ -21,6 +21,7 @@ function main() {
 	run_test "test_fail_remove_last_slot"
 	run_test "test_removekey1"
 	run_test "test_removekey2"
+	run_test "test_nullbyte_key"
 }
 
 ############
@@ -218,6 +219,43 @@ function test_removekey2() {
 
 	actual="$(getprop "pbkdf2iters:slot2")"
 	[[ "$expected" == "$actual" ]] || return 125
+}
+
+function test_nullbyte_key() {
+	local expected
+	local actual
+	local keyfile
+
+	test_convert_default || return 128
+	keyfile="$(mktemp)"
+	printf 'foo\0bar\0baz' > "$keyfile"
+	printf '%s\n' "$USERKEY" \
+		| sudo "$ZFSMS" add-key \
+			-s "slot2" \
+			-u "default" \
+			-L "file://$keyfile" \
+			"$TMPDS" \
+		> /dev/null \
+		|| { rm "$keyfile"; return $?; }
+	rm -rf "$keyfile"
+	expected="$(printf 'default\nslot2')"
+	actual="$("$ZFSMS" list-slots "$TMPDS" | sort)" || return 127
+	[[ "$expected" == "$actual" ]] || return 126
+	printf 'foo\0bar\0baz' \
+		| sudo "$ZFSMS" load-key \
+			-n \
+			-s slot2 \
+			-L prompt \
+			"$TMPDS" \
+		> /dev/null
+	printf 'foobarbaz' \
+		| sudo "$ZFSMS" load-key \
+			-n \
+			-s slot2 \
+			-L prompt \
+			"$TMPDS" \
+		> /dev/null \
+		&& return 125 # This should NOT work
 }
 
 main "$@"
