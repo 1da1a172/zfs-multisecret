@@ -148,7 +148,7 @@ function test_addkey() {
 		|| return $?
 	expected="$(printf 'default\nslot2')"
 	actual="$("$ZFSMS" list-slots "$TMPDS" | sort)" || return 127
-	[[ "$expected" == "$actual" ]]
+	[[ "$expected" == "$actual" ]] || return 126
 }
 
 function test_removeslot() {
