@@ -322,13 +322,13 @@ function list-slots() {
 
 function wrap() {
 	local zkey="$1"
-	local psph="$2"
+	local ukey="$2"
 	local iters="$3"
 
 	echo "$zkey" \
 		| openssl $CIPHER \
 			-iter "$iters" \
-			-pass "pass:$psph" \
+			-pass "pass:$ukey" \
 		| base64 -w 0
 }
 
@@ -405,17 +405,17 @@ function match-slot() {
 
 function get-user-key() {
 	local keylocation="$1"
-	local psph
+	local ukey
 
 	case "$keylocation" in
 	'prompt')
 		if [[ -t 0 ]]; then
-			read -s -r -p 'Enter passphrase: ' psph
+			read -s -r -p 'Enter passphrase: ' ukey
 			printf '\n'
 		else
-			read -r psph
+			read -r ukey
 		fi
-		echo "$psph"
+		echo "$ukey"
 		;;
 	file://* | https://* | http://*)
 		curl "$keylocation"
