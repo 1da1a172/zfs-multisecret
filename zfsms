@@ -406,8 +406,9 @@ function get-user-key() {
 	case "$keylocation" in
 	'prompt')
 		if [[ -t 0 ]]; then
+			# TODO: Add test for this
 			read -s -r -p 'Enter passphrase: ' ukey
-			printf '\n'
+			printf '\n' >&2
 		else
 			read -r ukey
 		fi
