@@ -220,7 +220,8 @@ function add-key() {
 	zkey="$(fetch-and-unwrap \
 		"$filesystem" \
 		"$old_user_key" \
-		"$uslot")"
+		"$uslot")" \
+		|| return 1
 
 	key="$(get-user-key "$loc")"
 	wrap-and-add-key "$zkey" "$key" "$loc" "$slot" "$iters" "$filesystem"
