@@ -7,6 +7,9 @@ typeset -r TMPDS="$TMPZPOOL/test"
 typeset USERKEY
 typeset USERKEY2
 
+# shellcheck source=./zfsms
+source "$ZFSMS"
+
 function main() {
 	teardown
 	run_test "test_convert_default"
@@ -79,32 +82,41 @@ function getprop() {
 	zfs get -Ho value "$1" "$TMPDS"
 }
 
+function validate_slot() {
+	local slot="$1"
+	local ukey="$2"
+	local wrapped_key
+	local iters
+
+	ukey="$(base64 -w 0 <<< "$ukey")"
+	wrapped_key="$(getprop wrappedkey:"$slot")"
+	iters="$(getprop pbkdf2iters:"$slot")"
+
+	[[ "$wrapped_key" != '-' ]] || return 64
+	[[ "$iters" != '-' ]] || return 63
+	unwrap "$wrapped_key" \
+		"$ukey" \
+		"$iters" \
+		> /dev/null \
+		|| return 62
+}
+
 #########
 # Tests #
 #########
 
 function test_convert_default() {
-	typeset wrapped_key
-	typeset iters
 	USERKEY='asdfasdf'
 
-	sudo "$ZFSMS" convert -L prompt "$TMPDS" <<< "$USERKEY"
-	wrapped_key="$(getprop wrappedkey:default)"
-	iters="$(getprop pbkdf2iters:default)"
-
-	[[ "$wrapped_key" != "-" ]] && [[ "$iters" != "-" ]]
+	sudo "$ZFSMS" convert -L prompt "$TMPDS" <<< "$USERKEY" || return 127
+	validate_slot 'default' "$USERKEY"
 }
 
 function test_convert_slot() {
-	typeset wrapped_key
-	typeset iters
-	typeset -r slot='slot1'
+	local slot='slot1'
 
-	sudo "$ZFSMS" convert -s "$slot" "$TMPDS" <<< asdfasdf
-	wrapped_key="$(getprop wrappedkey:"$slot")"
-	iters="$(getprop pbkdf2iters:"$slot")"
-
-	[[ "$wrapped_key" != "-" ]] && [[ "$iters" != "-" ]]
+	sudo "$ZFSMS" convert -s "$slot" "$TMPDS" <<< asdfasdf || return 127
+	validate_slot 'slot1' 'asdfasdf'
 }
 
 function test_loadkey_default_nop() {
@@ -148,8 +160,9 @@ function test_addkey() {
 		> /dev/null \
 		|| return $?
 	expected="$(printf 'default\nslot2')"
-	actual="$("$ZFSMS" list-slots "$TMPDS" | sort)" || return 127
-	[[ "$expected" == "$actual" ]] || return 126
+	actual="$("$ZFSMS" list-slots "$TMPDS" | sort)" || return 129
+	[[ "$expected" == "$actual" ]] || return 127
+	validate_slot 'slot2' "$USERKEY2"
 }
 
 function test_removeslot() {
