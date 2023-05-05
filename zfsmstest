@@ -88,7 +88,6 @@ function validate_slot() {
 	local wrapped_key
 	local iters
 
-	ukey="$(base64 -w 0 <<< "$ukey")"
 	wrapped_key="$(getprop wrappedkey:"$slot")"
 	iters="$(getprop pbkdf2iters:"$slot")"
 
