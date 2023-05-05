@@ -92,8 +92,8 @@ function validate_slot() {
 	wrapped_key="$(getprop wrappedkey:"$slot")"
 	iters="$(getprop pbkdf2iters:"$slot")"
 
-	[[ "$wrapped_key" != '-' ]] || return 64
-	[[ "$iters" != '-' ]] || return 63
+	[[ "$wrapped_key" =~ ^[[:alnum:]+/=]+$ ]] || return 64
+	[[ "$iters" =~ ^[[:digit:]]+$ ]] || return 63
 	unwrap "$wrapped_key" \
 		"$ukey" \
 		"$iters" \
