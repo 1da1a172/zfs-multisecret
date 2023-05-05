@@ -151,7 +151,13 @@ function load-key() {
 		exit 1
 	fi
 
-	[[ -n "$loc" ]] || loc="$(zfs get -Ho value "keylocation:$slot" "$filesystem")"
+	if [[ -z "$loc" ]]; then
+		if [[ -n "$slot" ]]; then
+			loc="$(zfs get -Ho value "keylocation:$slot" "$filesystem")"
+		else
+			loc='prompt'
+		fi
+	fi
 	ukey="$(get-user-key "$loc")"
 
 	# TODO: don't repeat work
