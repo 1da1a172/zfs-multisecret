@@ -378,12 +378,12 @@ function fetch-and-unwrap() {
 	local zkey
 
 	iters="$(zfs get -Ho value "pbkdf2iters:$slot" "$filesystem")" || exit 1
-	if [[ '-' == "$iters" ]]; then
+	if ! [[ "$iters" =~ ^[[:digit:]]+$ ]]; then
 		echo "slot '$slot' malformed"  >&2
 		exit 1
 	fi
 	wrapped="$(zfs get -Ho value "wrappedkey:$slot" "$filesystem")" || exit 1
-	if [[ '-' == "$wrapped" ]]; then
+	if ! base64 -d <<< "$wrapped" > /dev/null 2>&1 ; then
 		echo "slot '$slot' malformed"  >&2
 		exit 1
 	fi

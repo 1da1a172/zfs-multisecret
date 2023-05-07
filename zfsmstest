@@ -91,7 +91,7 @@ function validate_slot() {
 	wrapped_key="$(getprop wrappedkey:"$slot")"
 	iters="$(getprop pbkdf2iters:"$slot")"
 
-	[[ "$wrapped_key" =~ ^[[:alnum:]+/=]+$ ]] || return 64
+	base64 -d <<< "$wrapped_key" > /dev/null 2>&1 || return 64
 	[[ "$iters" =~ ^[[:digit:]]+$ ]] || return 63
 	unwrap "$wrapped_key" \
 		"$ukey" \
