@@ -333,6 +333,7 @@ function wrap() {
 	local iters="$3"
 
 	echo "$zkey" \
+		| xxd -r -p \
 		| openssl $CIPHER \
 			-iter "$iters" \
 			-pass "pass:$ukey" \
@@ -350,6 +351,7 @@ function unwrap() {
 			-d \
 			-iter "$iters" \
 			-pass "pass:$ukey" \
+		| xxd -p -c 0 \
 		| grep '^[[:xdigit:]]\{64\}$'
 }
 
