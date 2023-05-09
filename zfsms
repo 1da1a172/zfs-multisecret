@@ -352,7 +352,7 @@ function unwrap() {
 			-iter "$iters" \
 			-pass "pass:$ukey" \
 		| xxd -p -c 0 \
-		| grep '^[[:xdigit:]]\{64\}$'
+		| grep --color=never '^[[:xdigit:]]\{64\}$'
 }
 
 function wrap-and-add-key() {
