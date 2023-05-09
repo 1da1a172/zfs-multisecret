@@ -44,7 +44,7 @@ function help() {
 	printf 'usage:\n'
 	printf '\t%s convert [-s <slot>] [-L <keylocation>] <filesystem>\n' "$0"
 	printf '\t%s load-key [-n] [-s <slot>] [-L <keylocation>] <filesystem>\n' "$0"
-	printf '\t%s add-key -s <new slot> -u <existing slot> [-L <keylocation>] [-i <iters>] <filesystem>\n' "$0"
+	printf '\t%s add-key -s <new slot> -u <existing slot> [-L <keylocation>] [-I <iters>] <filesystem>\n' "$0"
 	printf '\t%s remove-slot -s slot <filesystem>\n' "$0"
 	printf '\t%s remove-key [-o keylocation=value] <filesystem>\n' "$0"
 	printf '\t%s change-key [-l] [-o keylocation@slot=value] [-o pbkdf2iters@slot=value] <filesystem>\n' "$0"
@@ -185,12 +185,12 @@ function add-key() {
 	local old_user_key_location
 	local old_user_key
 
-	while getopts s:u:L:i: name; do
+	while getopts s:u:L:I: name; do
 		case "$name" in
 			's') slot="$OPTARG" ;;
 			'u') uslot="$OPTARG" ;;
 			'L') loc="$OPTARG" ;;
-			'i') iters="$OPTARG" ;;
+			'I') iters="$OPTARG" ;;
 			'*')
 				help
 				exit 1
