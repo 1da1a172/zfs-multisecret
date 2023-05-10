@@ -65,19 +65,23 @@ function setup() {
 }
 
 function teardown() {
-	local expected
-	local actual
+	local tempdir
 
 	if zfs list "$TMPZPOOL" > /dev/null 2>&1; then
-		actual="$(zfs get -Ho value mountpoint "$TMPZPOOL")"
-		if [[ "$actual" == /tmp/zfsms.????????/$TMPZPOOL ]]; then
+		if tempdir="$(get_tempdir)"; then
 			sudo zpool destroy "$TMPZPOOL"
-			rm -rf "${actual%/"$TMPZPOOL"}"
+			rm -rf "$tempdir"
 		else
 			echo "zpool $TMPZPOOL exists but is not from the test script"
 			exit 1
 		fi
 	fi
+}
+
+function get_tempdir() {
+	local mp
+	mp="$(zfs get -Ho value mountpoint "$TMPZPOOL")"
+	[[ "$mp" == /tmp/zfsms.????????/$TMPZPOOL ]] && echo "${mp%/"$TMPZPOOL"}"
 }
 
 function getprop() {
@@ -90,7 +94,9 @@ function validate_slot() {
 	local wrapped_key
 	local iters
 
-	[[ -z "$ukey" ]] && { ukey="$(get-user-key "$(getprop keylocation:"$slot")")" || return 63; }
+	if [[ -z "$ukey" ]]; then
+		ukey="$(get-user-key "$(getprop keylocation:"$slot")")" || return 63
+	fi
 	wrapped_key="$(getprop wrappedkey:"$slot")"
 	iters="$(getprop pbkdf2iters:"$slot")"
 
