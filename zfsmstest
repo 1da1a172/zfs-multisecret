@@ -26,6 +26,7 @@ function main() {
 	run_test "test_removekey1"
 	run_test "test_removekey2"
 	run_test "test_keyfile"
+	run_test "test_changekey"
 	#run_test "test_nullbyte_key"
 }
 
@@ -89,17 +90,18 @@ function validate_slot() {
 	local wrapped_key
 	local iters
 
+	[[ -z "$ukey" ]] && { ukey="$(get-user-key "$(getprop keylocation:"$slot")")" || return 63; }
 	wrapped_key="$(getprop wrappedkey:"$slot")"
 	iters="$(getprop pbkdf2iters:"$slot")"
 
-	base64 -d <<< "$wrapped_key" > /dev/null 2>&1 || return 64
-	[[ "$iters" =~ ^[[:digit:]]+$ ]] || return 63
-	[[ "$iters" != 0 ]] || return 62
+	base64 -d <<< "$wrapped_key" > /dev/null 2>&1 || return 62
+	[[ "$iters" =~ ^[[:digit:]]+$ ]] || return 61
+	[[ "$iters" != 0 ]] || return 60
 	unwrap "$wrapped_key" \
 		"$ukey" \
 		"$iters" \
 		> /dev/null \
-		|| return 61
+		|| return 59
 }
 
 #########
@@ -283,6 +285,31 @@ function test_keyfile() {
 		"$TMPDS" \
 		> /dev/null
 	rm -rf "$keyfile"
+}
+
+function test_changekey() {
+	local actual
+	local keyfile
+
+	test_convert_default || return 128
+	keyfile="$(mktemp)"
+	printf 'c99e3c7291c303c5' > "$keyfile"
+	echo "$USERKEY" \
+		| sudo "$ZFSMS" change-key \
+			-s default \
+			-L "file://$keyfile" \
+			-I 100000 \
+			"$TMPDS" \
+		> /dev/null \
+		|| { rm "$keyfile"; return $?; }
+	actual="$("$ZFSMS" list-slots "$TMPDS")" || return 129
+	[[ 'default' == "$actual" ]] || return 127
+	[[ "file://$keyfile" == "$(getprop 'keylocation:default')" ]] || return 126
+	validate_slot 'default' || return $?
+}
+
+function test_inherit() {
+	false
 }
 
 function test_nullbyte_key() {

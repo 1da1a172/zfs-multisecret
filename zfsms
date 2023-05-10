@@ -47,8 +47,8 @@ function help() {
 	printf '\t%s add-key -s <new slot> -u <existing slot> [-L <keylocation>] [-I <iters>] <filesystem>\n' "$0"
 	printf '\t%s remove-slot -s <slot> <filesystem>\n' "$0"
 	printf '\t%s remove-key [-o keylocation=value] <filesystem>\n' "$0"
-	printf '\t%s change-key [-l] [-o keylocation@slot=value] [-o pbkdf2iters@slot=value] <filesystem>\n' "$0"
-	printf '\t%s change-key -i [-l] <filesystem>\n' "$0"
+	printf '\t%s change-key -s <slot> [-l] [-L <keylocation>] [-I <iters>] <filesystem>\n' "$0"
+	printf '\t%s change-key -i <filesystem>\n' "$0"
 	printf '\t%s list-slots <filesystem>\n' "$0"
 }
 
@@ -313,9 +313,56 @@ function remove-key() {
 }
 
 function change-key() {
-	while getopts lL:I: name; do
-		:
+	local filesystem
+	local keylocation
+	local iters
+	local new_ukey
+	local old_ukey
+	local zkey
+
+	while getopts s:L:I: name; do
+		case "$name" in
+			's') slot="$OPTARG" ;;
+			'L') keylocation="$OPTARG" ;;
+			'I') iters="$OPTARG" ;;
+			*)
+				help
+				exit 1
+				;;
+		esac
 	done
+	shift $((OPTIND - 1))
+	filesystem="$1"
+	if [[ -z "$filesystem" ]]; then
+		echo 'Filesystem not specified.' >&2
+		exit 1
+	fi
+	shift
+	[[ $# -eq 0 ]] || echo "WARNING: '$1' and later arguments are ignored." >&2
+	if [[ -z "$slot" ]]; then
+		if list-slots "$filesystem" | grep '^default$' > /dev/null; then
+			slot='default'
+		else
+			echo 'Slot not specified and default slot does not exist.' >&2
+			exit 1
+		fi
+	else
+		if ! list-slots "$filesystem" | grep "$slot" > /dev/null; then
+			echo "Slot '$slot' does not exsist."
+			exit 1
+		fi
+	fi
+	[[ -n "$iters" ]] || iters="$(zfs get -Ho value "pbkdf2iters:$slot")"
+	if ! [[ "$iters" -gt 0 ]]; then
+		echo "Invalid iters value '$iters'" >&2
+		exit 1
+	fi
+	[[ -n "$keylocation" ]] || keylocation="$(zfs get -Ho value "keylocation:$slot" "$filesystem")"
+
+	old_ukey="$(get-user-key "$(zfs get -Ho value "keylocation:$slot" "$filesystem")")"
+	zkey="$(fetch-and-unwrap "$filesystem" "$old_ukey" "$slot")"
+	new_ukey="$(get-user-key "$keylocation")"
+	wrap-and-add-key "$zkey" "$new_ukey" "$keylocation" "$slot" "$iters" "$filesystem"
 }
 
 function list-slots() {
