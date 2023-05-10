@@ -42,7 +42,7 @@ function main() {
 
 function help() {
 	printf 'usage:\n'
-	printf '\t%s convert [-s <slot>] [-L <keylocation>] <filesystem>\n' "$0"
+	printf '\t%s convert [-s <slot>] [-L <keylocation>] [-I <iters>] <filesystem>\n' "$0"
 	printf '\t%s load-key [-n] [-s <slot>] [-L <keylocation>] <filesystem>\n' "$0"
 	printf '\t%s add-key -s <new slot> -u <existing slot> [-L <keylocation>] [-I <iters>] <filesystem>\n' "$0"
 	printf '\t%s remove-slot -s slot <filesystem>\n' "$0"
@@ -65,10 +65,11 @@ function convert() {
 	local ukey
 	local wrappedkey
 
-	while getopts L:s: name; do
+	while getopts L:s:I: name; do
 		case "$name" in
 			'L') loc="$OPTARG" ;;
 			's') slot="$OPTARG" ;;
+			'I') iters="$OPTARG" ;;
 			*)
 				help >&2
 				exit 1
@@ -106,7 +107,14 @@ function convert() {
 	[[ -n "$loc" ]] || loc='prompt'
 	ukey="$(get-user-key "$loc")"
 
-	iters="$(zfs get -Ho value pbkdf2iters "$filesystem")"
+	if [[ -n "$iters" ]]; then
+		if ! [[ "$iters" =~ ^[[:digit:]]+$ ]]; then
+			echo "Iters must be a positive integer" >&2
+			exit 1
+		fi
+	else
+		iters="$(zfs get -Ho value pbkdf2iters "$filesystem")"
+	fi
 	[[ 0 == "$iters" ]] && iters="$DEFAULT_ITERS"
 
 	zkey="$(dd if=/dev/random status=none bs=32 count=1 | xxd -p -c 0)"

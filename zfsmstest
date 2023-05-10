@@ -14,6 +14,7 @@ function main() {
 	teardown
 	run_test "test_convert_default"
 	run_test "test_convert_slot"
+	run_test "test_convert_slot_with_iters"
 	run_test "test_loadkey_default_nop"
 	run_test "test_loadkey_default"
 	run_test "test_listslots_default"
@@ -93,11 +94,12 @@ function validate_slot() {
 
 	base64 -d <<< "$wrapped_key" > /dev/null 2>&1 || return 64
 	[[ "$iters" =~ ^[[:digit:]]+$ ]] || return 63
+	[[ "$iters" != 0 ]] || return 62
 	unwrap "$wrapped_key" \
 		"$ukey" \
 		"$iters" \
 		> /dev/null \
-		|| return 62
+		|| return 61
 }
 
 #########
@@ -107,15 +109,30 @@ function validate_slot() {
 function test_convert_default() {
 	USERKEY='asdfasdf'
 
-	sudo "$ZFSMS" convert -L prompt "$TMPDS" <<< "$USERKEY" || return 127
+	sudo "$ZFSMS" convert -L prompt "$TMPDS" <<< "$USERKEY" || return $?
 	validate_slot 'default' "$USERKEY"
 }
 
 function test_convert_slot() {
 	local slot='slot1'
+	local ukey='f80908b6'
 
-	sudo "$ZFSMS" convert -s "$slot" "$TMPDS" <<< asdfasdf || return 127
-	validate_slot 'slot1' 'asdfasdf'
+	sudo "$ZFSMS" convert -s "$slot" "$TMPDS" <<< "$ukey" || return $?
+	validate_slot "$slot" "$ukey"
+}
+
+function test_convert_slot_with_iters() {
+	local slot='slot1'
+	local ukey='72e378ed'
+	local iters=100000
+
+	sudo "$ZFSMS" convert -s "$slot" -I "$iters" "$TMPDS"<<< "$ukey" || return $?
+	[[ "$(getprop pbkdf2iters:$slot)" == "$iters" ]] || return 127
+	validate_slot "$slot" "$ukey" || return 126
+	unwrap "$(getprop wrappedkey:$slot)" "$ukey" "$iters" \
+		| sudo zfs load-key -n "$TMPDS" \
+		> /dev/null 2>&1 \
+		|| return 125
 }
 
 function test_loadkey_default_nop() {
