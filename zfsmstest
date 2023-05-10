@@ -27,6 +27,8 @@ function main() {
 	run_test "test_removekey2"
 	run_test "test_keyfile"
 	run_test "test_changekey"
+	run_test "test_convert_subds"
+	run_test "test_inherit"
 	#run_test "test_nullbyte_key"
 }
 
@@ -314,8 +316,34 @@ function test_changekey() {
 	validate_slot 'default' || return $?
 }
 
+function test_convert_subds() {
+	local tempdir
+	local mp
+
+	tempdir="$(get_tempdir)"
+	mp="$tempdir/sub"
+	mkdir "$mp"
+	sudo zfs create \
+		-o encryption=on \
+		-o keyformat=passphrase \
+		"$TMPDS/sub" \
+		<<< "$INITKEY"
+	USERKEY='becbb556f845e4e2'
+	sudo "$ZFSMS" convert "$TMPDS/sub" <<< "$USERKEY" || return $?
+	unwrap "$(zfs get -Ho value wrappedkey:default "$TMPDS/sub")" \
+		"$USERKEY" \
+		"$(zfs get -Ho value pbkdf2iters:default "$TMPDS/sub")" \
+		> /dev/null \
+		|| return 127
+}
+
 function test_inherit() {
-	false
+	test_convert_subds || return 128
+	sudo "$ZFSMS" inherit "$TMPDS/sub"
+	[[ "$(sudo zfs get -Ho value pbkdf2iters:default "$TMPDS/sub")" == '-' ]] || return 127
+	[[ "$(sudo zfs get -Ho value keylocation:default "$TMPDS/sub")" == '-' ]] || return 126
+	[[ "$(sudo zfs get -Ho value wrappedkey:default "$TMPDS/sub")" == '-' ]] || return 125
+	sudo zfs load-key -n "$TMPDS" <<< "$INITKEY" > /dev/null 2>&1 || return 124
 }
 
 function test_nullbyte_key() {

@@ -22,6 +22,7 @@ function main() {
 	"remove-key")  remove-key  "$@" ;;
 	"change-key")  change-key  "$@" ;;
 	"list-slots")  list-slots  "$@" ;;
+	"inherit")     inherit     "$@" ;;
 	"-h") ;&
 	"--help") ;&
 	"help")
@@ -48,7 +49,7 @@ function help() {
 	printf '\t%s remove-slot -s <slot> <filesystem>\n' "$0"
 	printf '\t%s remove-key [-o keylocation=value] <filesystem>\n' "$0"
 	printf '\t%s change-key -s <slot> [-l] [-L <keylocation>] [-I <iters>] <filesystem>\n' "$0"
-	printf '\t%s change-key -i <filesystem>\n' "$0"
+	printf '\t%s inherit <filesystem>\n' "$0"
 	printf '\t%s list-slots <filesystem>\n' "$0"
 }
 
@@ -365,13 +366,28 @@ function change-key() {
 	wrap-and-add-key "$zkey" "$new_ukey" "$keylocation" "$slot" "$iters" "$filesystem"
 }
 
+function inherit() {
+	if [[ 1 != "$#" ]]; then
+		help
+		exit 1
+	fi
+
+	local filesystem="$1"
+	zfs change-key -i "$filesystem" || return $?
+	for slot in $(list-slots "$filesystem"); do
+		zfs inherit "wrappedkey:$slot" "$filesystem"
+		zfs inherit "pbkdf2iters:$slot" "$filesystem"
+		zfs inherit "keylocation:$slot" "$filesystem"
+	done
+}
+
 function list-slots() {
 	if [[ 1 != "$#" ]]; then
 		help
 		exit 1
 	fi
 
-	typeset filesystem="$1"
+	local filesystem="$1"
 	zfs get all "$filesystem" -Ho property \
 		| grep wrappedkey \
 		| cut -f 2 -d : \
