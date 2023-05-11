@@ -23,35 +23,153 @@ function main() {
 	"change-key")  change-key  "$@" ;;
 	"list-slots")  list-slots  "$@" ;;
 	"inherit")     inherit     "$@" ;;
-	"-h") ;&
-	"--help") ;&
-	"help")
-		help
-		exit 0
-		;;
-	"")
-		help
-		exit 1
-		;;
+	"help" | "")   help        "$@" ;;
 	*)
-		echo "Unknown subcommand '$subcmd'" >&2
-		help
+		echo "Unknown subcommand '$subcmd'. Try '$0 help'" >&2
 		exit 1
 		;;
 	esac
 }
 
 function help() {
-	printf 'usage:\n'
-	printf '\t%s convert [-s <slot>] [-L <keylocation>] [-I <iters>] <filesystem>\n' "$0"
-	printf '\t%s load-key [-n] [-s <slot>] [-L <keylocation>] <filesystem>\n' "$0"
-	printf '\t%s add-key -s <new slot> -u <existing slot> [-L <keylocation>] [-I <iters>] <filesystem>\n' "$0"
-	printf '\t%s remove-slot -s <slot> <filesystem>\n' "$0"
-	printf '\t%s remove-key [-o keylocation=value] <filesystem>\n' "$0"
-	printf '\t%s change-key -s <slot> [-l] [-L <keylocation>] [-I <iters>] <filesystem>\n' "$0"
-	printf '\t%s inherit <filesystem>\n' "$0"
-	printf '\t%s list-slots <filesystem>\n' "$0"
+	if [[ $# == 0 ]]; then
+		printf 'usage: %s <subcommand> <args>\n' "$0"
+		printf '\n'
+		printf 'Subcommands are:\n'
+		printf '\thelp <subcommand>\n'
+		printf '\tconvert\n'
+		printf '\tload-key\n'
+		printf '\tadd-key\n'
+		printf '\tremove-slot\n'
+		printf '\tremove-key\n'
+		printf '\tchange-key\n'
+		printf '\tinherit\n'
+		printf '\tlist-slots\n'
+	else
+		case "$1" in
+		'help')        help-help        ;;
+		'convert')     help-convert     ;;
+		'load-key')    help-load-key    ;;
+		'add-key')     help-add-key     ;;
+		'remove-slot') help-remove-slot ;;
+		'remove-key')  help-remove-key  ;;
+		'change-key')  help-change-key  ;;
+		'inherit')     help-inherit     ;;
+		'list-slots')  help-list-slots  ;;
+		esac
+	fi
 }
+
+function help-help {
+cat - << EOF
+usage: $0 help <subcommand>
+
+Show help for a subcommand. Subcommands are:
+    help
+    convert
+    load-key
+    add-key
+    remove-slot
+    remove-key
+    change-key
+    inherit
+    list-slots
+
+Subcommands and arguments closely map to ZFS(8).
+EOF
+}
+
+function help-convert {
+cat - << EOF
+Usage: $0 convert [-s <slot>] [-L <keylocation>] [-I <iters>] <filesystem>
+Converts and exsisting encrypted dataset to use zfsms.
+
+  -s <slot>         Specify the initial slot name. Defaults to "default".
+  -L <keylocation>  Specify the keyloaction. Defaults to "prompt".
+  -I <iters>        Specify the number of iterations used in the key derivation
+                    function. Defaults to "$DEFAULT_ITERS"
+  <filesystem>      The filesystem to convert.
+
+After conversion, the original key will no longer decrypt the dataset!
+Also note, keys are expected to a single line of printable ASCII.'
+EOF
+}
+
+function help-load-key {
+cat - << EOF
+Usage: $0 load-key [-n] [-s <slot>] [-L <keylocation>] <filesystem>
+Load a key for <filesystem>, in the same manner as ZFS-LOAD-KEY(8).
+
+  -n         Do a dry-run ("No-op").
+  -s <slot>  Slot holding the user key being loaded. This is autodetected (at
+             the cost of performance) if not provided.
+EOF
+}
+
+function help-add-key {
+cat - << EOF
+Usage: $0 add-key -s <new slot> -u <existing slot> [-L <keylocation>] [-I <iters>] <filesystem>
+Add a user key to a new slot.
+
+  -s <new slot>       Name of the slot being created.
+  -u <existing slot>  Name of the slot to unwrap the zfs key from.
+  -L <keylocation>    Specify the keyloaction. Defaults to "prompt".
+  -I <iters>          Specify the number of iterations used in the key
+                      derivation function. Defaults to "$DEFAULT_ITERS"
+EOF
+}
+
+function help-remove-slot {
+cat - << EOF
+Usage: $0 remove-slot -s <slot> <filesystem>
+Remove a slot by the slot's name.
+
+  -s <slot>  Slot to remove
+
+This will refuse to remove the last slot.
+EOF
+}
+
+function help-remove-key {
+cat - << EOF
+Usage: $0 remove-key [-o keylocation=value] <filesystem>
+Remove a slot by specifying the key
+
+  -L <keylocation>    Override the keyloaction for this operation.
+
+This will refuse to remove the last slot.
+EOF
+}
+
+function help-change-key {
+cat - << EOF
+Usage: $0 change-key -s <slot> [-L <keylocation>] [-I <iters>] <filesystem>
+Change a user key or its properties.
+
+  -L <keylocation>    Specify a new keyloaction.
+  -I <iters>          Specify the number of iterations used in the key
+                      derivation function.
+
+Properties not provided are not altered.
+EOF
+}
+
+function help-inherit {
+cat - << EOF
+Usage: $0 inherit <filesystem>
+Inherit encryption properties and keys from a parent filesystem.
+
+This is analogous to \`zfs change-key -i <filesystem>\`
+EOF
+}
+
+function help-list-slots {
+cat - << EOF
+Usage: $0 list-slots <filesystem>
+List all key slots for <filesystem>
+EOF
+}
+
 
 ################
 # Sub commands #
