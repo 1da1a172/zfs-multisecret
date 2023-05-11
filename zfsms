@@ -318,7 +318,7 @@ function add-key() {
 			'u') uslot="$OPTARG" ;;
 			'L') loc="$OPTARG" ;;
 			'I') iters="$OPTARG" ;;
-			'*')
+			*)
 				help
 				exit 1
 				;;
@@ -367,7 +367,7 @@ function remove-slot() {
 	while getopts s: name; do
 		case "$name" in
 			's') slot="$OPTARG" ;;
-			'*')
+			*)
 				help
 				exit 1
 				;;
@@ -404,7 +404,7 @@ function remove-key() {
 	while getopts o: name; do
 		case "$name" in
 			'o') keylocation="$OPTARG" ;;
-			'*')
+			*)
 				help
 				exit 1
 				;;
