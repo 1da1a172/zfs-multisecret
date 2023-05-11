@@ -91,7 +91,7 @@ Converts and exsisting encrypted dataset to use zfsms.
   <filesystem>      The filesystem to convert.
 
 After conversion, the original key will no longer decrypt the dataset!
-Also note, keys are expected to a single line of printable ASCII.'
+Also note, keys are expected to a single line of printable ASCII.
 EOF
 }
 
