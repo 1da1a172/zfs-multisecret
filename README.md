@@ -32,8 +32,7 @@ zpool create \
 zfsms convert ztest <<< a_passphrase_for_the_default_slot
 ```
 
-|-|-|
-|**NOTE**| After converting a filesystem, the old key will no longer work. |
+**NOTE**: After converting a filesystem, the old key will no longer work.
 ```
 # zfs load-key -n ztest <<< some_initial_passphrase
 Key load error: Hex key too short (expected 64).
